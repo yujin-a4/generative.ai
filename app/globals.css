@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 🌟 [추가됨] 오로라 애니메이션 효과 정의 */
+
+/* 파란색 오로라 움직임 (20초 동안 천천히) */
+@keyframes aurora-drift-1 {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  50% { transform: translate(10%, -10%) scale(1.1); opacity: 0.3; }
+  100% { transform: translate(-5%, 15%) scale(0.9); opacity: 0.4; }
+}
+
+/* 보라색 오로라 움직임 (25초 동안 천천히 반대로) */
+@keyframes aurora-drift-2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  50% { transform: translate(-10%, 15%) scale(1.2); opacity: 0.3; }
+  100% { transform: translate(5%, -5%) scale(0.95); opacity: 0.4; }
+}
+
+/* 실제 적용할 클래스명 */
+.animate-aurora-slow-1 {
+  animation: aurora-drift-1 20s ease-in-out infinite alternate;
+}
+
+.animate-aurora-slow-2 {
+  animation: aurora-drift-2 25s ease-in-out infinite alternate;
+}

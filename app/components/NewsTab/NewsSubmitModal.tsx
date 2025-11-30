@@ -3,13 +3,43 @@
 import { useState, useEffect } from "react";
 import { analyzeNewsArticle } from "@/app/actions/analyzeNews";
 import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
-import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService"; // updateNews, NewsArticle 추가
+import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService";
 
-// 🌟 여기가 핵심! initialData를 받을 수 있게 타입 정의 수정
+// 🌟 [수정] 3개 그룹으로 데이터 확장
+const SITE_GROUPS = [
+  {
+    title: "🇰🇷 국내 AI/IT 핵심",
+    color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300",
+    sites: [
+      { name: "AI 타임스", url: "https://www.aitimes.com/", desc: "국내 AI 전문" },
+      { name: "GeekNews", url: "https://news.hada.io/", desc: "기술 요약" },
+      { name: "요즘IT", url: "https://yozm.wishket.com/magazine/list/develop/", desc: "IT 칼럼" },
+    ]
+  },
+  {
+    title: "🌍 글로벌 공신력",
+    color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300",
+    sites: [
+      { name: "TechCrunch", url: "https://techcrunch.com/category/artificial-intelligence/", desc: "AI 속보" },
+      { name: "MIT Tech", url: "https://www.technologyreview.com/topic/artificial-intelligence/", desc: "심층 분석" },
+      { name: "The Verge", url: "https://www.theverge.com/ai-artificial-intelligence", desc: "테크 트렌드" },
+    ]
+  },
+  {
+    title: "🏢 빅테크 공식 블로그",
+    color: "text-zinc-700 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300",
+    sites: [
+      { name: "DeepMind", url: "https://deepmind.google/discover/blog/", desc: "구글 연구" },
+      { name: "OpenAI", url: "https://openai.com/blog", desc: "GPT 소식" },
+      { name: "MS AI", url: "https://blogs.microsoft.com/ai/", desc: "코파일럿" },
+    ]
+  }
+];
+
 interface NewsSubmitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialData?: NewsArticle | null; // 이 부분이 추가되어야 에러가 사라집니다
+  initialData?: NewsArticle | null;
 }
 
 export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSubmitModalProps) {
@@ -18,15 +48,15 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 가이드 아코디언 상태
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // 🌟 모달이 열릴 때, 수정 모드인지 확인해서 데이터 채워넣기
   useEffect(() => {
     if (isOpen && initialData) {
-      // [수정 모드]
       setStep("REVIEW");
       setUrl(initialData.url);
       
-      // Timestamp를 input date value(YYYY-MM-DD)로 변환
       let dateStr = "";
       if (initialData.publishedAt?.toDate) {
          dateStr = initialData.publishedAt.toDate().toISOString().split("T")[0];
@@ -37,10 +67,10 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
         date: dateStr
       });
     } else if (isOpen && !initialData) {
-      // [새 글 모드] 초기화
       setStep("INPUT");
       setUrl("");
       setAnalysisData(null);
+      setIsGuideOpen(false); 
     }
   }, [isOpen, initialData]);
 
@@ -67,23 +97,13 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
     
     try {
       if (initialData && initialData.id) {
-        // 🌟 수정 모드일 때: updateNews 호출
-        await updateNews(initialData.id, {
-          ...analysisData,
-          url: url
-        });
+        await updateNews(initialData.id, { ...analysisData, url: url });
         alert("뉴스가 수정되었습니다! ✨");
       } else {
-        // 🌟 새 글 모드일 때: addNews 호출
-        await addNews({
-          ...analysisData,
-          url: url
-        });
+        await addNews({ ...analysisData, url: url });
         alert("뉴스가 게시되었습니다! 🎉");
       }
-      
       onClose(); 
-      
     } catch (error) {
       console.error(error);
       alert("처리 중 오류가 발생했습니다.");
@@ -124,6 +144,47 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                 />
+                
+                {/* 🌟 [수정됨] 3단 그룹 아코디언 */}
+                <div className="mt-3">
+                  <button 
+                    type="button"
+                    onClick={() => setIsGuideOpen(!isGuideOpen)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    {isGuideOpen ? "▼ 추천 사이트 접기" : "💡 어디서 뉴스를 찾나요? (추천 사이트 보기)"}
+                  </button>
+
+                  {isGuideOpen && (
+                    <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 p-1">
+                      {SITE_GROUPS.map((group) => (
+                        <div key={group.title}>
+                          <h5 className="text-[10px] font-bold text-gray-400 mb-1.5 ml-1">{group.title}</h5>
+                          <div className="grid grid-cols-3 gap-2">
+                            {group.sites.map((site) => (
+                              <a 
+                                key={site.name}
+                                href={site.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex flex-col px-2 py-2 rounded-lg border border-transparent hover:border-black/5 hover:shadow-sm transition-all text-center ${group.color}`}
+                              >
+                                <span className="text-xs font-bold block mb-0.5 truncate">
+                                   {site.name}
+                                </span>
+                                <span className="text-[9px] opacity-70 truncate block">
+                                  {site.desc}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* 🌟 [끝] */}
+
               </div>
               {error && <p className="text-red-500 text-sm">⚠️ {error}</p>}
               <button

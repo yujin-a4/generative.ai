@@ -16,11 +16,13 @@ export default function NewsTab() {
   const [selectedNews, setSelectedNews] = useState<NewsArticle | null>(null);
   const [editTarget, setEditTarget] = useState<NewsArticle | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [viewMode, setViewMode] = useState<"grid" | "timeline" | "weekly">("grid");
+  
+  // 뷰 모드
+  const [viewMode, setViewMode] = useState<"grid" | "timeline" | "weekly" | "bookmarks">("grid");
 
-  // 필터 및 검색 상태
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [sortBy, setSortBy] = useState<"latest" | "likes">("latest");
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
@@ -49,7 +51,6 @@ export default function NewsTab() {
       {/* 헤더 & 상단 컨트롤 */}
       <div className="flex flex-col gap-6 mb-4 border-b border-gray-200 dark:border-zinc-800 pb-6">
         
-        {/* 1열: 제목 & 메인 버튼들 */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -72,6 +73,10 @@ export default function NewsTab() {
               <button onClick={() => setViewMode("weekly")} className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "weekly" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}>
                 📉 주간요약
               </button>
+              {/* 즐겨찾기 탭 */}
+              <button onClick={() => setViewMode("bookmarks")} className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "bookmarks" ? "bg-white dark:bg-zinc-600 text-yellow-500 font-bold shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}>
+                ⭐ 즐겨찾기
+              </button>
             </div>
 
             <button 
@@ -87,28 +92,43 @@ export default function NewsTab() {
         {viewMode !== 'weekly' && (
           <div className="flex flex-col gap-4">
             
-            {/* 1. 검색창 (상단 우측 정렬) */}
-            <div className="flex justify-end w-full">
+            {/* 🌟 [수정] 1. 검색창 및 정렬 (깔끔하게 한 줄 배치) */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+               
+               {/* 정렬 버튼 (명확한 캡슐형 토글) */}
+               {viewMode !== 'bookmarks' && (
+                 <div className="flex text-xs font-bold self-start md:self-auto">
+                   <button onClick={() => setSortBy('latest')} 
+                     className={`px-3 py-1.5 transition-all rounded-l-full border border-gray-300 dark:border-zinc-700 
+                     ${sortBy === 'latest' ? 'bg-indigo-600 text-white border-indigo-600 dark:border-indigo-500' : 'bg-white dark:bg-zinc-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-700'}`}
+                   >
+                     🕒 최신순
+                   </button>
+                   <button onClick={() => setSortBy('likes')} 
+                     className={`px-3 py-1.5 transition-all rounded-r-full border border-l-0 border-gray-300 dark:border-zinc-700 
+                     ${sortBy === 'likes' ? 'bg-indigo-600 text-white border-indigo-600 dark:border-indigo-500' : 'bg-white dark:bg-zinc-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-700'}`}
+                   >
+                     🔥 좋아요순
+                   </button>
+                 </div>
+               )}
+               
+               {viewMode === 'bookmarks' && <div className="hidden md:block"></div>}
+
                <div className="w-full md:w-[400px]">
-                 <SearchBar 
-                    value={searchKeyword} 
-                    onChange={setSearchKeyword} 
-                 />
+                 <SearchBar value={searchKeyword} onChange={setSearchKeyword} />
                </div>
             </div>
 
-            {/* 2. 카테고리 필터 (하단 가로 스크롤) */}
-            <div className="w-full overflow-x-auto pb-2">
-               <CategoryFilter 
-                  selectedCategory={filterCategory} 
-                  onSelect={setFilterCategory} 
-               />
+            {/* 🌟 [수정] 2. 카테고리 필터 (구분선 추가로 계층 분리) */}
+            <div className="w-full overflow-x-auto pb-2 pt-4 border-t border-gray-100 dark:border-zinc-800 mt-2">
+               <CategoryFilter selectedCategory={filterCategory} onSelect={setFilterCategory} />
             </div>
           </div>
         )}
       </div>
 
-      {/* 뷰 모드에 따라 컴포넌트 스위칭 */}
+      {/* 뷰 모드 스위칭 */}
       {viewMode === "grid" && (
         <NewsList 
           refreshKey={refreshKey} 
@@ -116,7 +136,20 @@ export default function NewsTab() {
           onNewsEdit={handleEdit}
           onRefresh={handleRefresh}
           filterCategory={filterCategory} 
-          searchKeyword={searchKeyword}   
+          searchKeyword={searchKeyword}
+          sortBy={sortBy}
+        />
+      )}
+      
+      {viewMode === "bookmarks" && (
+        <NewsList 
+          refreshKey={refreshKey} 
+          onNewsClick={(news) => setSelectedNews(news)}
+          onNewsEdit={handleEdit}
+          onRefresh={handleRefresh}
+          filterCategory={filterCategory} 
+          searchKeyword={searchKeyword}
+          onlyBookmarked={true}
         />
       )}
       
@@ -127,7 +160,7 @@ export default function NewsTab() {
           onNewsEdit={handleEdit}
           onRefresh={handleRefresh}
           filterCategory={filterCategory} 
-          searchKeyword={searchKeyword}   
+          searchKeyword={searchKeyword} 
         />
       )}
 
@@ -135,7 +168,6 @@ export default function NewsTab() {
         <WeeklySummary />
       )}
 
-      {/* 모달들 */}
       <NewsSubmitModal 
         isOpen={isSubmitOpen} 
         onClose={handleModalClose}
