@@ -1,6 +1,6 @@
 import { 
     collection, addDoc, getDocs, deleteDoc, updateDoc, doc, 
-    query, where, orderBy, limit, serverTimestamp, Timestamp, // 👈 where 추가 확인
+    query, where, orderBy, limit, serverTimestamp, Timestamp,
     arrayUnion, arrayRemove 
   } from "firebase/firestore";
   import { db, auth } from "@/lib/firebase"; 
@@ -20,7 +20,7 @@ import {
     views?: number;
     likes?: number;
     likedBy?: string[]; 
-    bookmarkedBy?: string[]; // 🌟 [추가] 즐겨찾기한 유저 ID 목록
+    bookmarkedBy?: string[];
     authorId?: string; 
   }
   
@@ -38,7 +38,7 @@ import {
         views: 0,
         likes: 0,
         likedBy: [],
-        bookmarkedBy: [], // 🌟 [추가] 초기값
+        bookmarkedBy: [],
         isVisible: true,
         authorId: authorId 
       });
@@ -101,13 +101,13 @@ import {
     }
   }
 
-  // 🌟 [신규] 내가 즐겨찾기한 뉴스만 가져오기
+  // 내가 즐겨찾기한 뉴스만 가져오기
   export async function getBookmarkedNews(userId: string) {
     try {
       const q = query(
         collection(db, "news"),
-        where("bookmarkedBy", "array-contains", userId), // 내 ID가 배열에 있는 것만
-        orderBy("publishedAt", "desc"), // 최신순 정렬
+        where("bookmarkedBy", "array-contains", userId),
+        orderBy("publishedAt", "desc"),
         limit(50)
       );
       const querySnapshot = await getDocs(q);
@@ -117,27 +117,71 @@ import {
       })) as NewsArticle[];
     } catch (error) {
       console.error("Error fetching bookmarks: ", error);
-      // ⚠️ 주의: Firestore 인덱스 에러가 콘솔에 뜨면 링크 클릭해서 인덱스 생성해줘야 함
       return [];
     }
   }
   
-  // 주간 요약 목록 가져오기
-  export async function getWeeklySummaries() {
+  // =====================
+  // 주간 요약 관련
+  // =====================
+  
+  // 주간 요약 목록 가져오기 (공개된 것만 or 관리자는 전체)
+  export async function getWeeklySummaries(includeUnpublished = false) {
     try {
-      const q = query(
-        collection(db, "weekly_summaries"),
-        orderBy("created_at", "desc"),
-        limit(10)
-      );
+      let q;
+      if (includeUnpublished) {
+        // 관리자용: 전체
+        q = query(
+          collection(db, "weekly_summaries"),
+          orderBy("created_at", "desc"),
+          limit(10)
+        );
+      } else {
+        // 일반 사용자: 공개된 것만
+        q = query(
+          collection(db, "weekly_summaries"),
+          where("isPublished", "==", true),
+          orderBy("created_at", "desc"),
+          limit(10)
+        );
+      }
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       }));
     } catch (error) {
-      console.error("Error fetching summaries:", error);
+      console.error("Error fetching weekly summaries:", error);
       return [];
+    }
+  }
+
+  // 특정 주차의 주간 요약 가져오기
+  export async function getWeeklySummaryByWeek(weekLabel: string, includeUnpublished = false) {
+    try {
+      let q;
+      if (includeUnpublished) {
+        q = query(
+          collection(db, "weekly_summaries"),
+          where("week_label", "==", weekLabel),
+          limit(1)
+        );
+      } else {
+        q = query(
+          collection(db, "weekly_summaries"),
+          where("week_label", "==", weekLabel),
+          where("isPublished", "==", true),
+          limit(1)
+        );
+      }
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    } catch (error) {
+      console.error("Error fetching weekly summary:", error);
+      return null;
     }
   }
   
@@ -151,6 +195,127 @@ import {
       throw error;
     }
   }
+
+  // 주간 요약 공개하기
+  export async function publishWeeklySummary(id: string) {
+    try {
+      const summaryRef = doc(db, "weekly_summaries", id);
+      await updateDoc(summaryRef, { isPublished: true });
+    } catch (error) {
+      console.error("Error publishing weekly summary: ", error);
+      throw error;
+    }
+  }
+
+  // 주간 요약 삭제하기
+  export async function deleteWeeklySummary(id: string) {
+    try {
+      await deleteDoc(doc(db, "weekly_summaries", id));
+    } catch (error) {
+      console.error("Error deleting weekly summary: ", error);
+      throw error;
+    }
+  }
+
+  // =====================
+  // 월간 요약 관련
+  // =====================
+
+  // 월간 요약 목록 가져오기
+  export async function getMonthlySummaries(includeUnpublished = false) {
+    try {
+      let q;
+      if (includeUnpublished) {
+        q = query(
+          collection(db, "monthly_summaries"),
+          orderBy("created_at", "desc"),
+          limit(12)
+        );
+      } else {
+        q = query(
+          collection(db, "monthly_summaries"),
+          where("isPublished", "==", true),
+          orderBy("created_at", "desc"),
+          limit(12)
+        );
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      console.error("Error fetching monthly summaries:", error);
+      return [];
+    }
+  }
+
+  // 특정 월의 월간 요약 가져오기
+  export async function getMonthlySummaryByMonth(year: number, month: number, includeUnpublished = false) {
+    try {
+      let q;
+      if (includeUnpublished) {
+        q = query(
+          collection(db, "monthly_summaries"),
+          where("year", "==", year),
+          where("month", "==", month),
+          limit(1)
+        );
+      } else {
+        q = query(
+          collection(db, "monthly_summaries"),
+          where("year", "==", year),
+          where("month", "==", month),
+          where("isPublished", "==", true),
+          limit(1)
+        );
+      }
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    } catch (error) {
+      console.error("Error fetching monthly summary:", error);
+      return null;
+    }
+  }
+
+  // 월간 요약 수정하기
+  export async function updateMonthlySummary(id: string, data: any) {
+    try {
+      const summaryRef = doc(db, "monthly_summaries", id);
+      await updateDoc(summaryRef, data);
+    } catch (error) {
+      console.error("Error updating monthly summary: ", error);
+      throw error;
+    }
+  }
+
+  // 월간 요약 공개하기
+  export async function publishMonthlySummary(id: string) {
+    try {
+      const summaryRef = doc(db, "monthly_summaries", id);
+      await updateDoc(summaryRef, { isPublished: true });
+    } catch (error) {
+      console.error("Error publishing monthly summary: ", error);
+      throw error;
+    }
+  }
+
+  // 월간 요약 삭제하기
+  export async function deleteMonthlySummary(id: string) {
+    try {
+      await deleteDoc(doc(db, "monthly_summaries", id));
+    } catch (error) {
+      console.error("Error deleting monthly summary: ", error);
+      throw error;
+    }
+  }
+
+  // =====================
+  // 좋아요 / 북마크
+  // =====================
 
   // 좋아요 토글
   export async function toggleLikeNews(newsId: string, userId: string, currentLikedBy: string[] = []) {
@@ -175,7 +340,7 @@ import {
     }
   }
 
-  // 🌟 [신규] 즐겨찾기(북마크) 토글 함수
+  // 즐겨찾기(북마크) 토글 함수
   export async function toggleBookmarkNews(newsId: string, userId: string, currentBookmarkedBy: string[] = []) {
     try {
       const newsRef = doc(db, "news", newsId);

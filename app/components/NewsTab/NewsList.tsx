@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getRecentNews, getBookmarkedNews, NewsArticle } from "@/app/lib/newsService"; 
 import NewsCard from "./NewsCard";
 import { getExtendedSearchTerms } from "@/app/lib/searchUtils"; 
 import { auth } from "@/lib/firebase"; 
-import { onAuthStateChanged } from "firebase/auth"; // 👈 추가
+import { onAuthStateChanged } from "firebase/auth";
+import NewsLoading from "./NewsLoading";
 
 interface NewsListProps {
   refreshKey: number;
@@ -16,14 +18,14 @@ interface NewsListProps {
   searchKeyword: string;
   sortBy?: "latest" | "likes"; 
   onlyBookmarked?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 export default function NewsList({ 
-  refreshKey, onNewsClick, onNewsEdit, onRefresh, filterCategory, searchKeyword, sortBy = "latest", onlyBookmarked = false 
+  refreshKey, onNewsClick, onNewsEdit, onRefresh, filterCategory, searchKeyword, sortBy = "latest", onlyBookmarked = false, startDate, endDate 
 }: NewsListProps) {
-  const [newsList, setNewsList] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(auth.currentUser); // 유저 상태 관리
+  const [user, setUser] = useState(auth.currentUser);
 
   // 1. 유저 상태 감지 (새로고침 시 로그인 풀림 방지)
   useEffect(() => {
@@ -33,54 +35,71 @@ export default function NewsList({
     return () => unsubscribe();
   }, []);
 
-  // 2. 데이터 불러오기
-  useEffect(() => {
-    async function fetchNews() {
-      setLoading(true);
-      
-      try {
-        if (onlyBookmarked) {
-          // 즐겨찾기 모드: 유저 정보가 확인된 후에만 요청
-          if (user) {
-            const data = await getBookmarkedNews(user.uid);
-            setNewsList(data);
-          } else {
-            // 아직 로딩 중일 수도 있으니, auth가 초기화된 후에도 없으면 빈 배열
-            setNewsList([]); 
-          }
-        } else {
-          // 일반 모드
-          const data = await getRecentNews(100, sortBy); 
-          setNewsList(data);
-        }
-      } catch (e) {
-        console.error("데이터 로딩 실패", e);
-      } finally {
-        setLoading(false);
+  // 2. React Query로 데이터 캐싱
+  const { data: newsList = [], isLoading: loading, refetch } = useQuery({
+    queryKey: onlyBookmarked 
+      ? ['news', 'bookmarks', user?.uid] 
+      : ['news', 'list', sortBy],
+    queryFn: async () => {
+      if (onlyBookmarked) {
+        if (!user) return [];
+        return await getBookmarkedNews(user.uid);
       }
-    }
-    
-    // user가 바뀔 때(로그인 완료 시)에도 실행되도록 의존성 추가
-    fetchNews();
-  }, [refreshKey, sortBy, onlyBookmarked, user]); 
-
-  // ... (필터링 로직은 그대로) ...
-  const filteredList = newsList.filter((news) => {
-    const categoryMatch = filterCategory === "ALL" || news.category === filterCategory;
-    
-    if (!searchKeyword.trim()) return categoryMatch;
-
-    const searchTerms = getExtendedSearchTerms(searchKeyword);
-    const keywordMatch = searchTerms.some(term => 
-      news.title.toLowerCase().includes(term) ||
-      news.shortSummary.toLowerCase().includes(term) ||
-      news.tags?.some(tag => tag.toLowerCase().includes(term))
-    );
-
-    return categoryMatch && keywordMatch;
+      return await getRecentNews(100, sortBy);
+    },
+    enabled: onlyBookmarked ? !!user : true,
+    staleTime: 1000 * 60 * 3, // 3분간 캐시 유지 (fresh)
   });
 
-  if (loading) return <div className="text-center py-20">로딩 중... ⏳</div>;
+  // 3. refreshKey 변경 시 refetch
+  useEffect(() => {
+    if (refreshKey > 0) {
+      refetch();
+    }
+  }, [refreshKey, refetch]);
+
+  // 필터링 로직 (카테고리 + 검색어 + 날짜 범위)
+  const filteredList = newsList.filter((news) => {
+    // 카테고리 필터
+    const categoryMatch = filterCategory === "ALL" || news.category === filterCategory;
+    
+    // 검색어 필터
+    let keywordMatch = true;
+    if (searchKeyword.trim()) {
+      const searchTerms = getExtendedSearchTerms(searchKeyword);
+      keywordMatch = searchTerms.some(term => 
+        news.title.toLowerCase().includes(term) ||
+        news.shortSummary.toLowerCase().includes(term) ||
+        news.tags?.some(tag => tag.toLowerCase().includes(term))
+      );
+    }
+
+    // 🌟 날짜 범위 필터
+    let dateMatch = true;
+    if (startDate || endDate) {
+      const targetDate = news.publishedAt || news.createdAt;
+      if (targetDate) {
+        const newsDate = targetDate.toDate();
+        
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (newsDate < start) dateMatch = false;
+        }
+        
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (newsDate > end) dateMatch = false;
+        }
+      }
+    }
+
+    return categoryMatch && keywordMatch && dateMatch;
+  });
+
+  // 🎨 귀여운 로딩 화면
+  if (loading) return <NewsLoading />;
 
   if (onlyBookmarked && !user) {
     return (

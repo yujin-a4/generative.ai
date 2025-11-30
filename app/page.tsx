@@ -45,26 +45,29 @@ function MainTabs() {
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans">
-      {/* 🌟 [수정] 배경색을 연한 그라데이션으로 변경 */}
       <header className="relative bg-gradient-to-b from-blue-50/70 to-purple-50/70 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 pt-20 pb-12 px-6 text-center">
         
+        {/* 좌측 상단 YBM AI Lab 텍스트 */}
+        <div className="absolute top-6 left-6 z-50">
+            <span className="text-sm font-medium text-gray-400 dark:text-gray-500">YBM AI Lab</span>
+        </div>
+
         {/* 우측 상단 로그인 버튼 */}
         <div className="absolute top-6 right-6 z-50">
           <LoginButton />
         </div>
 
         <div className="relative z-10">
-          {/* 메인 타이틀 (원래의 진한 그라데이션 유지) */}
-          <h1 className="text-5xl md:text-6xl font-extrabold mb-6 tracking-tight leading-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
-              AI
-            </span> Insight
+          {/* 메인 타이틀: AI Trend Lab */}
+          <h1 className="text-5xl md:text-6xl font-extrabold mb-6 tracking-tight leading-tight text-gray-900 dark:text-white">
+            AI <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+              Trend
+            </span> Lab
           </h1>
           
-          {/* 부제 */}
+          {/* 🌟 [수정] 메인 부제: 함께 만들어 나가는 AI 트렌드 지도 */}
           <p className="text-lg md:text-xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto font-medium leading-relaxed">
-            YBM AI Lab 여러분들을 위한 <br className="md:hidden"/>
-            실시간 <span className="text-gray-800 dark:text-gray-200 font-bold">에듀테크 & AI 트렌드</span> 큐레이션
+            함께 만들어 나가는 AI 트렌드 지도
           </p>
         </div>
       </header>
