@@ -1,11 +1,13 @@
-// app/components/ReportTab.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllReports } from "@/app/actions/analyze";
+import { getAllReports, deleteReport } from "@/app/actions/analyze"; // deleteReport 추가
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { auth } from "@/lib/firebase"; // Auth 추가
+import { onAuthStateChanged } from "firebase/auth";
 
-// 기존 TABS 정의 유지
+// 카테고리 정의
 const REPORT_CATEGORIES = [
   { id: "llm", label: "LLM 순위", icon: "🤖", searchKey: "LLM", keywords: ["LLM", "종합"] },
   { id: "image", label: "이미지 AI", icon: "🎨", searchKey: "Image", keywords: ["Image", "이미지"] },
@@ -21,16 +23,35 @@ export default function ReportTab() {
   const [allReports, setAllReports] = useState<any[]>([]);
   const [filteredReports, setFilteredReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState("llm");
+  const [isAdmin, setIsAdmin] = useState(false); // 🌟 관리자 여부 상태
+
+  // URL에서 서브 탭 정보 가져오기
+  const searchParams = useSearchParams();
+  const initialSub = searchParams.get('sub');
+  
+  // 초기값을 URL 파라미터로 설정 (없으면 'llm')
+  const [activeCategory, setActiveCategory] = useState(initialSub || "llm");
+
+  // 데이터 불러오기 함수
+  const fetchData = async () => {
+    setLoading(true);
+    const data = await getAllReports();
+    setAllReports(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const data = await getAllReports();
-      setAllReports(data);
-      setLoading(false);
-    }
     fetchData();
+
+    // 🌟 관리자 인증 상태 체크
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.email === "yujinkang1008@gmail.com") {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -47,6 +68,22 @@ export default function ReportTab() {
     setFilteredReports(filtered);
   }, [activeCategory, allReports]);
 
+  // 🌟 리포트 삭제 핸들러
+  const handleDeleteReport = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault(); // Link 이동 방지
+    e.stopPropagation(); // 이벤트 전파 방지
+    
+    if (!confirm("정말로 이 리포트를 삭제하시겠습니까? (복구 불가)")) return;
+
+    const res = await deleteReport(id);
+    if (res.success) {
+      alert("리포트가 삭제되었습니다.");
+      fetchData(); // 목록 새로고침
+    } else {
+      alert("삭제 실패");
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", {
       year: "numeric", month: "long", day: "numeric",
@@ -62,7 +99,7 @@ export default function ReportTab() {
 
   return (
     <div className="w-full">
-      {/* 2차 탭 네비게이션 (리포트 카테고리) */}
+      {/* 2차 탭 네비게이션 */}
       <div className="sticky top-[73px] z-10 bg-gray-50/95 dark:bg-black/95 backdrop-blur-md border-b border-gray-200 dark:border-zinc-800 px-4 mb-8">
         <div className="max-w-5xl mx-auto flex overflow-x-auto no-scrollbar space-x-4 md:space-x-8">
           {REPORT_CATEGORIES.map((cat) => (
@@ -103,7 +140,7 @@ export default function ReportTab() {
           </Link>
         </div>
 
-        {/* 리포트 그리드 (기존 코드 동일) */}
+        {/* 리포트 그리드 */}
         {loading ? (
           <div className="text-center py-20">
             <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
@@ -112,10 +149,22 @@ export default function ReportTab() {
         ) : filteredReports.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
             {filteredReports.map((report) => (
-              <Link href={`/report/${report.id}`} key={report.id} className="group block">
+              <Link href={`/report/${report.id}`} key={report.id} className="group block relative">
                  <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-200 dark:border-zinc-800 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col relative">
+                  
+                  {/* 🌟 관리자 전용 삭제 버튼 */}
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => handleDeleteReport(e, report.id)}
+                      className="absolute top-2 right-2 z-20 p-2 bg-white/80 hover:bg-red-100 text-gray-500 hover:text-red-600 rounded-full shadow-sm transition-colors"
+                      title="리포트 삭제"
+                    >
+                      🗑️
+                    </button>
+                  )}
+
                   {isNew(report.created_at) && (
-                    <div className="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md animate-pulse z-10">
+                    <div className="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md animate-pulse z-10 pointer-events-none">
                       NEW
                     </div>
                   )}

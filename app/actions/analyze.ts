@@ -2,7 +2,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '@/lib/firebase'; // ✅ db를 직접 import (getDb 제거)
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore'; // 🌟 deleteDoc 추가
 
 export interface ReportInput { siteName: string; content: string; }
 export interface AnalysisResult { success: boolean; data?: { analysisResult: any }; error?: string; }
@@ -201,5 +201,16 @@ export async function getLatestReport() {
   } catch (error) {
     console.error("getLatestReport Error:", error);
     return null;
+  }
+}
+
+// 🌟 [추가] 리포트 삭제 함수
+export async function deleteReport(id: string) {
+  try {
+    await deleteDoc(doc(db, 'reports', id));
+    return { success: true };
+  } catch (error) {
+    console.error("Delete Report Error:", error);
+    return { success: false, error: "삭제 실패" };
   }
 }

@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import ReportTab from "@/app/components/ReportTab";
 import NewsTab from "@/app/components/NewsTab/NewsTab";
-import LoginButton from "@/app/components/LoginButton"; // 🌟 로그인 버튼 추가
+import LoginButton from "@/app/components/LoginButton";
 
 function MainTabs() {
   const searchParams = useSearchParams();
@@ -32,7 +32,7 @@ function MainTabs() {
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' 
                 : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
           >
-            📊 LLM 리포트
+            📊 생성형 AI 순위
           </button>
         </div>
       </div>
@@ -48,10 +48,10 @@ function MainTabs() {
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans">
-      {/* 🌟 헤더 (로그인 버튼 배치) */}
+      {/* 헤더 (로그인 버튼 배치) */}
       <header className="relative bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 pt-16 pb-8 px-6 text-center">
         
-        {/* 🌟 우측 상단 로그인 버튼 (절대 위치) */}
+        {/* 우측 상단 로그인 버튼 (절대 위치) */}
         <div className="absolute top-6 right-6 z-50">
           <LoginButton />
         </div>

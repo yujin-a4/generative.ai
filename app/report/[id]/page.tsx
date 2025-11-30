@@ -14,7 +14,11 @@ export default async function ReportDetailPage({ params }: { params: { id: strin
       {/* 네비게이션 */}
       <nav className="border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex justify-between items-center">
-          <Link href="/" className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-2">
+          {/* 🌟 핵심 수정: href="/" -> "/?tab=reports" */}
+          <Link 
+            href="/?tab=reports" 
+            className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-2"
+          >
             ← 목록으로 돌아가기
           </Link>
           <div className="font-bold text-xl text-indigo-600 dark:text-indigo-400">LLM Insight 🧠</div>

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { getAllReports } from "@/app/actions/analyze";
 import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
+import TrendBackButton from "@/app/components/TrendBackButton"; // 🌟 [추가] 뒤로가기 버튼 Import
 
 // Chart.js 등록 (트렌드 차트용)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
@@ -217,6 +218,12 @@ export default function TrendsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-xl p-10">
+        
+        {/* 🌟 [추가] 뒤로가기 버튼 */}
+        <div className="mb-4">
+          <TrendBackButton />
+        </div>
+
         <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-6">
           📈 기간별 성능 트렌드 분석
         </h1>
