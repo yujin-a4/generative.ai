@@ -1,7 +1,7 @@
 'use server';
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getDb } from '@/lib/firebase';
+import { db } from '@/lib/firebase'; // ✅ db를 직접 import (getDb 제거)
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 
 export interface ReportInput { siteName: string; content: string; }
@@ -14,7 +14,7 @@ async function analyzeWithGemini(combinedText: string, reportType: string): Prom
   const genAI = new GoogleGenerativeAI(apiKey);
   
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.0-flash-exp', // 모델명 수정 (flash-exp 권장)
     generationConfig: {
       responseMimeType: "application/json",
       maxOutputTokens: 40000, 
@@ -150,30 +150,56 @@ export async function analyzeReports(reports: ReportInput[], reportType: string)
   }
 }
 
-// DB 함수들
+// 🌟 DB 함수들 수정: getDb() 삭제 및 db 바로 사용
+
 export async function saveReportToDB(t: string, r: any) {
   try {
-    const db = getDb();
+    // const db = getDb(); // ❌ 삭제
     const id = (await addDoc(collection(db, 'reports'), {
       report_title: t, analysis_result: r, created_at: serverTimestamp(), status: 'completed'
     })).id;
     return { success: true, reportId: id };
-  } catch (e) { return { success: false, error: '' }; }
+  } catch (e) { 
+    console.error("Save Error:", e);
+    return { success: false, error: '저장 실패' }; 
+  }
 }
+
 export async function getAllReports() {
-  const db = getDb();
-  const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data(), created_at: d.data().created_at?.toDate().toISOString() }));
+  // const db = getDb(); // ❌ 삭제
+  try {
+    const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data(), 
+      created_at: d.data().created_at?.toDate ? d.data().created_at.toDate().toISOString() : new Date().toISOString() 
+    }));
+  } catch (error) {
+    console.error("getAllReports Error:", error);
+    return [];
+  }
 }
+
 export async function getReportById(id: string) {
-  const db = getDb();
-  const d = await getDoc(doc(db, 'reports', id));
-  return d.exists() ? { id: d.id, ...d.data() } : null;
+  // const db = getDb(); // ❌ 삭제
+  try {
+    const d = await getDoc(doc(db, 'reports', id));
+    return d.exists() ? { id: d.id, ...d.data() } : null;
+  } catch (error) {
+    console.error("getReportById Error:", error);
+    return null;
+  }
 }
+
 export async function getLatestReport() {
-  const db = getDb();
-  const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'), limit(1));
-  const s = await getDocs(q);
-  return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+  // const db = getDb(); // ❌ 삭제
+  try {
+    const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'), limit(1));
+    const s = await getDocs(q);
+    return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+  } catch (error) {
+    console.error("getLatestReport Error:", error);
+    return null;
+  }
 }

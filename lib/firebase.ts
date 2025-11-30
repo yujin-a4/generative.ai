@@ -1,5 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth } from 'firebase/auth'; // 🌟 1. 이 줄이 꼭 있어야 합니다!
 
 // Firebase 설정 타입
 interface FirebaseConfig {
@@ -9,6 +10,7 @@ interface FirebaseConfig {
   storageBucket: string;
   messagingSenderId: string;
   appId: string;
+  measurementId?: string;
 }
 
 // 환경 변수에서 Firebase 설정 가져오기
@@ -22,51 +24,15 @@ const getFirebaseConfig = (): FirebaseConfig => {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
   };
 
-  // 필수 환경 변수 검증
-  if (!config.apiKey || !config.projectId) {
-    throw new Error(
-      'Firebase 설정이 완료되지 않았습니다. .env.local 파일을 확인해주세요.'
-    );
-  }
-
   return config;
 };
 
-// Firebase App 초기화 (싱글톤 패턴)
-let app: FirebaseApp | undefined;
-let db: Firestore | undefined;
+const config = getFirebaseConfig();
 
-export const initializeFirebase = (): { app: FirebaseApp; db: Firestore } => {
-  // 이미 초기화된 앱이 있으면 재사용
-  if (getApps().length > 0) {
-    app = getApps()[0];
-    db = getFirestore(app);
-    return { app, db };
-  }
+// 앱 초기화 (싱글톤)
+const app: FirebaseApp = getApps().length > 0 ? getApps()[0] : initializeApp(config);
 
-  // 새로 초기화
-  const config = getFirebaseConfig();
-  app = initializeApp(config);
-  db = getFirestore(app);
-
-  return { app, db };
-};
-
-// Firestore 인스턴스 가져오기
-export const getDb = (): Firestore => {
-  if (!db) {
-    const { db: initializedDb } = initializeFirebase();
-    return initializedDb;
-  }
-  return db;
-};
-
-// Firebase App 인스턴스 가져오기
-export const getApp = (): FirebaseApp => {
-  if (!app) {
-    const { app: initializedApp } = initializeFirebase();
-    return initializedApp;
-  }
-  return app;
-};
-
+// 서비스 내보내기
+export const db: Firestore = getFirestore(app);
+export const auth: Auth = getAuth(app); // 🌟 2. 이 줄이 없어서 에러가 난 겁니다!
+export { app };
