@@ -56,6 +56,7 @@ export async function analyzeNewsArticle(url: string) {
     3. insight: 이 뉴스가 '에듀테크'나 'AI 산업'에 미치는 영향이나 시사점 (150자 이내, 한국어).
     4. category: 다음 중 가장 적절한 ID 선택 (EDUTECH_AI, AI_TECH, AI_TOOLS, INDUSTRY_TREND, COMPANY_NEWS, POLICY_ETHICS, RESEARCH, PRODUCT_RELEASE).
     5. tags: 관련 해시태그 3~5개.
+    6. 영어 기사라도 제목 및 내용은 모두 한국어로 번역해서 작성할 것.
 
     [출력 JSON 형식]
     {
