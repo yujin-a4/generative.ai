@@ -1,19 +1,16 @@
 "use client";
 
 import { useState, Suspense } from "react";
-// import { useSearchParams } from "next/navigation"; // 👈 [삭제] URL 파라미터 체크 로직 제거
 import ReportTab from "@/app/components/ReportTab";
 import NewsTab from "@/app/components/NewsTab/NewsTab";
 import LoginButton from "@/app/components/LoginButton";
-import AuroraBackground from "@/app/components/AuroraBackground"; 
 
 function MainTabs() {
-  // 🌟 [강제 수정] 기본 탭을 무조건 'news'로 고정했습니다.
   const [activeTab, setActiveTab] = useState<'news' | 'reports'>('news');
 
   return (
     <>
-      {/* 탭 네비게이션 (깔끔한 기본 스타일 유지) */}
+      {/* 탭 네비게이션 */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-black/90 backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
         <div className="max-w-5xl mx-auto flex">
           <button
@@ -48,20 +45,18 @@ function MainTabs() {
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans">
-      <header className="relative bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 pt-20 pb-12 px-6 text-center overflow-hidden">
+      {/* 🌟 [수정] 배경색을 연한 그라데이션으로 변경 */}
+      <header className="relative bg-gradient-to-b from-blue-50/70 to-purple-50/70 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 pt-20 pb-12 px-6 text-center">
         
-        {/* 배경 오로라 효과 (마우스 반응형, 연한 색상) */}
-        <AuroraBackground />
-
         {/* 우측 상단 로그인 버튼 */}
         <div className="absolute top-6 right-6 z-50">
           <LoginButton />
         </div>
 
         <div className="relative z-10">
-          {/* 메인 타이틀 */}
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 dark:text-white mb-6 tracking-tight leading-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x">
+          {/* 메인 타이틀 (원래의 진한 그라데이션 유지) */}
+          <h1 className="text-5xl md:text-6xl font-extrabold mb-6 tracking-tight leading-tight">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
               AI
             </span> Insight
           </h1>

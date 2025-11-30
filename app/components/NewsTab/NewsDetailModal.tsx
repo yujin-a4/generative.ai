@@ -12,8 +12,9 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
   if (!news) return null;
 
   const category = getCategoryInfo(news.category);
-  const dateStr = news.createdAt?.toDate 
-    ? news.createdAt.toDate().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) 
+  // 🌟 [수정] createdAt 대신 publishedAt을 사용하여 날짜 표시
+  const dateStr = news.publishedAt?.toDate 
+    ? news.publishedAt.toDate().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) 
     : "";
 
   return (
@@ -36,6 +37,7 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
             <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${category.color} bg-white/80 dark:bg-zinc-900/80 shadow-sm border`}>
               {category.icon} {category.name}
             </span>
+            {/* dateStr은 이제 기사 발행일입니다. */}
             <span className="text-sm text-gray-500">{dateStr}</span>
           </div>
           
