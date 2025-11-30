@@ -3,7 +3,6 @@ import ReportView from "@/app/admin/ReportView";
 import Link from "next/link";
 
 export default async function ReportDetailPage({ params }: { params: { id: string } }) {
-  // ⭐ 수정 포인트: 변수 뒤에 ': any'를 붙여서 타입을 유연하게 만듭니다.
   const report: any = await getReportById(params.id);
 
   if (!report) {
@@ -23,8 +22,8 @@ export default async function ReportDetailPage({ params }: { params: { id: strin
       </nav>
 
       <main className="p-4 md:p-8 animate-fade-in-up">
-        {/* ReportView 재사용 */}
-        <ReportView data={report.analysis_result} />
+        {/* isEditable 미전달 (기본값 false) → 일반 사용자는 편집 불가 */}
+        <ReportView data={report} />
       </main>
     </div>
   );

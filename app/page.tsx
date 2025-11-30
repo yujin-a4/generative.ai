@@ -14,6 +14,9 @@ const TABS = [
   { id: "service", label: "서비스 랭킹", icon: "🏆", searchKey: "Service", keywords: ["Service", "서비스"] },
 ];
 
+// 🌟 추가: 요약에 사용할 아이콘 배열
+const SUMMARY_ICONS = ["🎯", "📈", "💡", "⚡", "🔮"];
+
 export default function HomePage() {
   const [allReports, setAllReports] = useState<any[]>([]); // 전체 리포트
   const [filteredReports, setFilteredReports] = useState<any[]>([]); // 필터링된 리포트
@@ -139,13 +142,33 @@ export default function HomePage() {
                     <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
                       <span>📅 {formatDate(report.created_at)}</span>
                     </div>
+                    
+                    {/* 💡 수정된 요약 인사이트 표시 로직 (아이콘 + 간결) */}
                     <div className="space-y-2 mb-6 flex-1">
-                      {report.analysis_result?.overview_summary?.slice(0, 2).map((s: string, i: number) => (
-                        <p key={i} className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                          {s.replace(/["']/g, "")}
-                        </p>
-                      ))}
+                      {report.analysis_result?.report_type === "LLM" ? (
+                        <>
+                          {/* 요약 1: 총평의 첫 문장 (가장 중요한 인사이트) */}
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 line-clamp-1 flex items-center gap-2">
+                            <span className="text-lg">{SUMMARY_ICONS[0]}</span>
+                            {report.analysis_result?.summary_insights?.[0] || "총평 인사이트 준비 중..."}
+                          </p>
+                          {/* 요약 2: 총평의 두 번째 문장 (두 번째 핵심 내용) */}
+                          <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-2">
+                            <span className="text-lg">{SUMMARY_ICONS[1]}</span>
+                            {report.analysis_result?.summary_insights?.[1] || "두 번째 핵심 분석 내용은 없습니다."}
+                          </p>
+                        </>
+                      ) : (
+                        // LLM 외 리포트는 기존 overview_summary 사용
+                        report.analysis_result?.overview_summary?.slice(0, 2).map((s: string, i: number) => (
+                          <p key={i} className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
+                            {s.replace(/["']/g, "")}
+                          </p>
+                        ))
+                      )}
                     </div>
+                    {/* ------------------------------------- */}
+                    
                     <div className="flex items-center text-indigo-600 font-semibold text-sm group-hover:underline">
                       상세 리포트 보기 &rarr;
                     </div>

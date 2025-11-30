@@ -6,117 +6,174 @@ import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, do
 
 export interface ReportInput { siteName: string; content: string; }
 export interface AnalysisResult { success: boolean; data?: { analysisResult: any }; error?: string; }
-export interface SaveResult { success: boolean; reportId?: string; error?: string; }
 
 async function analyzeWithGemini(combinedText: string, reportType: string): Promise<any> {
-  console.log('GEMINI_API_KEY Loaded:', process.env.GEMINI_API_KEY ? 'YES' : 'NO');
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY가 설정되지 않았습니다.');
+  const apiKey = process.env.GEMINI_API_KEY; 
+  if (!apiKey) throw new Error('GEMINI_API_KEY가 설정되지 않았습니다. .env.local 파일을 확인하세요.');
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.0-flash',
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 40000, 
+    }
+  });
 
-  let specificPrompt = "";
+  // 🌟 현재 날짜로 제목 생성
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const reportTitle = `${year}년 ${month}월 LLM 순위 리포트`;
 
-  // ======================================================================================
-  // 🤖 LLM 모드: 사용자가 지정한 6대 카테고리 1:1 매핑
-  // ======================================================================================
+  let prompt = "";
+  
   if (reportType === "LLM") {
-    specificPrompt = `
-      **[분석 모드: LLM 정밀 분석]**
-      사용자가 입력한 데이터 소스를 바탕으로, 아래 **6가지 카테고리**에 대한 분석 결과를 **무조건** 생성해라.
+    prompt = `
+      너는 'AI 벤치마크 데이터 파서'이다. 
+      입력된 텍스트의 구조(컬럼 순서)를 정확히 파악하여 데이터를 추출하라.
 
-      **[데이터 매핑 규칙 (절대 준수)]**
-      1. 💻 **코딩 & 개발 (Coding)**: 
-         - 소스: **Artificial Analysis** (LiveCodeBench, HumanEval 점수)
-      2. 🧮 **수학 & 논리 (Math)**: 
-         - 소스: **Artificial Analysis** (MATH, AIME, GSM8K 점수)
-      3. 🇰🇷 **한국어 능력 (Korean)**: 
-         - 소스: LMSYS **'Korean'** 탭 데이터 (없으면 Overall 점수 참고하여 추정)
-      4. 📝 **창의력 & 글쓰기 (Creative Writing)**: 
-         - 소스: LMSYS **'Creative Writing'** 탭 데이터
-      5. 🤖 **지시 이행 (Instruction Following)**: 
-         - 소스: LMSYS **'Instruction Following'** 탭 데이터
-      6. 🔬 **프롬프트 이해도 (Hard Prompts)**: 
-         - 소스: LMSYS **'Hard Prompts'** 탭 데이터
+      [🚨 절대 규칙 1: LMSYS (Vote) 추출]
+      - **데이터 구조:** [Rank] 순서대로 정렬되어 있다.
+      - **행동:** Rank 열의 1위부터 10위까지 Model, Score, Organization을 추출하라. (순차 추출)
+      - **Score 파싱:** Score 열에 있는 **숫자(1000 이상)**를 그대로 가져와라.
 
-      **[통합 랭킹 (Overall) 기준]**
-      - LMSYS **'Overall'** 탭의 Elo 점수 순위를 그대로 따를 것.
+      [🚨 절대 규칙 2: LiveBench (Test) 추출]
+      - **데이터 구조:** [Model] [Org] [Global] [Reasoning] [Coding] [Agentic] [Math] [Data] ...
+      - **행동:** 전체 텍스트를 스캔하여 각 항목별로 **점수가 높은 순서대로 재정렬(Re-sort)**하여 Top 10을 뽑아라.
+      
+      **[재정렬 기준 컬럼]**
+      1. **Total Ranking:** [Global Average] (1번째 숫자) 기준 Top 10
+      2. **Reasoning:** [Reasoning] (3번째 숫자) 기준 Top 10
+      3. **Coding:** [Coding] (4번째 숫자) 기준 Top 10
+      4. **Math:** [Mathematics] (6번째 숫자) 기준 Top 10
+      5. **Data Analysis:** [Data Analysis] (7번째 숫자) 기준 Top 10
+      *(Test 점수는 0~100 사이 숫자만 유효)*
 
-      **[작성 가이드]**
-      - 위 6개 카테고리는 **데이터가 조금이라도 있으면 무조건 결과에 포함**시켜라. (누락 금지)
-      - 만약 특정 탭(예: Korean) 데이터가 아예 없으면, 'Overall' 순위를 참고하여 Top 5를 채우고 설명에 "종합 점수 기반 추정"이라고 적어라.
+      [🚨 절대 규칙 3: 공통 출력 형식]
+      - **Top 10 필수:** 모든 리스트는 10개 아이템으로 채울 것.
+      - **제조사(org) 식별:** 모델명을 보고 제조사(OpenAI, Anthropic, Google, xAI, Meta 등)를 반드시 기입.
+      - **한줄평(comment):** 각 카테고리별로 데이터 분포를 보고 **한글로 짧은 분석 코멘트**를 작성하라.
+
+      [🚨 절대 규칙 4: 총평 (summary_insights) 작성]
+      - 데이터를 종합 분석하여 **정확히 5문장**의 총평을 작성하라.
+      - 각 문장은 구체적인 모델명, 제조사명, 순위, 점수 등을 포함해야 한다.
+      - 단순 나열이 아닌 **인사이트와 시사점**을 담아라.
+      - 예시:
+        1. "이번 평가에서 Anthropic의 Claude 4.5 Opus가 Test와 Vote 양쪽에서 1위를 차지하며 종합 최강자로 등극했다."
+        2. "OpenAI의 GPT-4o는 코딩과 수학에서 강세를 보였으나, 한국어 성능은 5위에 그쳤다."
+        3. "Google Gemini는 멀티턴 대화에서 두각을 나타냈지만, 창의적 글쓰기는 상대적 약점으로 드러났다."
+        4. "xAI의 Grok은 Hard Prompts에서 의외의 선전을 했으나, 전반적 안정성은 아직 검증이 필요하다."
+        5. "전체적으로 Anthropic과 OpenAI의 양강 구도가 굳어지는 가운데, Google이 추격하는 양상이다."
+
+      [출력 JSON 포맷 (Strict)]
+      {
+        "report_type": "LLM",
+        "report_title": "${reportTitle}",
+        "raw_data": {
+          "test_benchmarks": {
+             "total_ranking": [
+                {"rank":1, "model":"...", "score":0, "org":"..."},
+                ... (Top 10)
+             ], 
+             "sub_categories": {
+               "reasoning": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "coding": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "math": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "data_analysis": { "items": [ ...Top 10 items... ], "comment": "분석..." }
+             }
+          },
+          "vote_rankings": {
+             "overall": [ 
+                {"rank":1, "model":"...", "elo":1350, "org":"OpenAI"},
+                ... (Top 10)
+             ], 
+             "sub_categories": {
+               "korean": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "coding": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "hard_prompts": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "creative_writing": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "multi_turn": { "items": [ ...Top 10 items... ], "comment": "분석..." },
+               "instruction_following": { "items": [ ...Top 10 items... ], "comment": "분석..." }
+             }
+          }
+        },
+        "summary_insights": [
+           "총평 1문장 (구체적 모델명/점수 포함)...",
+           "총평 2문장...",
+           "총평 3문장...",
+           "총평 4문장...",
+           "총평 5문장..."
+        ]
+      }
+      [입력 데이터]
+      ${combinedText}
     `;
-  } 
-  // ... (Image, Video, Coding, Agent, Service 모드는 기존과 동일하게 유지)
-  else if (reportType === "Image") {
-    specificPrompt = `
-      **[분석 모드: 이미지 생성 AI]**
-      1. ✨ **text_to_image**: LMSYS Text-to-Image Elo 순위.
-      2. 🖌️ **image_editing**: LMSYS Image Editing Elo 순위.
-      (가격/속도 제외)
+  } else {
+    prompt = `
+      너는 'AI 트렌드 분석가'야. '${reportType}' 분야 리포트 작성.
+      [JSON 포맷]
+      {
+        "report_type": "${reportType}",
+        "report_title": "${reportType} 트렌드 리포트",
+        "overview_summary": ["요약1", "요약2"],
+        "text_to_image": [], "image_editing": [], "deep_analysis": [], "benchmark_integration": [] 
+      }
+      ${combinedText}
     `;
   }
-  else if (reportType === "Video") { specificPrompt = `**[분석 모드: 영상 AI]** VBench 기준. 품질/움직임/일관성/시간.`; }
-  else if (reportType === "Coding") { specificPrompt = `**[분석 모드: 코딩 툴]** Aider(편집) + LiveCodeBench(생성).`; }
-  else if (reportType === "Agent") { specificPrompt = `**[분석 모드: 에이전트]** GAIA 기준 성공률.`; }
-  else if (reportType === "Service") { specificPrompt = `**[분석 모드: 서비스 랭킹]** 인기/만족도 기준.`; }
-
-  const prompt = `
-    너는 'AI 데이터 분석가'야. 제공된 텍스트를 분석해.
-    ${specificPrompt}
-
-    [공통 작성 가이드]
-    1. **Top 5 필수:** 모든 카테고리(LLM은 6개)에 대해 상위 5개 모델을 반드시 추출해라.
-    2. **점수:** 숫자만 표기.
-    3. **한글 작성:** 설명은 한국어로.
-
-    [응답 포맷 (JSON Only)]
-    {
-      "report_type": "${reportType}",
-      "report_title": "2025년 11월 ${reportType} 분석 리포트",
-      "overview_summary": ["🔥 트렌드", "👑 1위", "💡 인사이트"],
-      
-      // [LLM 모드일 때 필수 포함해야 할 6개 항목]
-      "best_for_purpose": [
-        { "category": "코딩 & 개발", "icon": "💻", "model_name": "...", "reason": "...", "score_summary": "..." },
-        { "category": "수학 & 논리", "icon": "🧮", "model_name": "...", "reason": "...", "score_summary": "..." },
-        { "category": "한국어 능력", "icon": "🇰🇷", "model_name": "...", "reason": "...", "score_summary": "..." },
-        { "category": "창의력 & 글쓰기", "icon": "📝", "model_name": "...", "reason": "...", "score_summary": "..." },
-        { "category": "지시 이행", "icon": "🤖", "model_name": "...", "reason": "...", "score_summary": "..." },
-        { "category": "프롬프트 이해도", "icon": "🔬", "model_name": "...", "reason": "...", "score_summary": "..." }
-      ],
-      "deep_analysis": [
-        { "category": "코딩 & 개발", "analysis": "...", "top_models": [{ "rank": 1, "model": "...", "score": 95 }] },
-        // ... 나머지 5개 카테고리도 동일하게 작성
-      ],
-      "benchmark_integration": [ { "rank": 1, "model": "...", "tier": "S-Tier", "description": "..." } ],
-
-      // [이미지 전용]
-      "text_to_image": [], "image_editing": []
-    }
-
-    [데이터 소스]
-    ${combinedText.substring(0, 1000000)}
-  `;
 
   try {
-    console.log(`🚀 Gemini에게 분석 요청 시작 (모드: ${reportType})...`);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(text);
   } catch (error) {
-    console.error(error);
+    console.error("Gemini Error:", error);
     return { raw: "", parsed: false };
   }
 }
 
-// (하단 Firestore 함수들은 기존 그대로 유지)
-async function saveToFirestore(t:string, r:any){const db=getDb();return(await addDoc(collection(db,'reports'),{report_title:t,analysis_result:r,created_at:serverTimestamp(),status:'completed'})).id;}
-export async function analyzeReports(r:ReportInput[],t:string){if(!r.length)return{success:false,error:''};try{const c=r.map((i,x)=>`Src ${x}:${i.siteName}\n${i.content}`).join('\n');const res=await analyzeWithGemini(c,t);return{success:true,data:{analysisResult:res}};}catch(e){return{success:false,error:''}}}
-export async function saveReportToDB(t:string,r:any){try{const id=await saveToFirestore(t||"리포트",r);return{success:true,reportId:id}}catch(e){return{success:false,error:''}}}
-export async function getAllReports(){const db=getDb();const q=query(collection(db,'reports'),orderBy('created_at','desc'));return(await getDocs(q)).docs.map(d=>({id:d.id,...d.data(),created_at:d.data().created_at?.toDate().toISOString()||new Date().toISOString()}))}
-export async function getReportById(id:string){const db=getDb();const d=await getDoc(doc(db,'reports',id));return d.exists()?{id:d.id,...d.data()}:null}
-export async function getLatestReport(){const db=getDb();const q=query(collection(db,'reports'),orderBy('created_at','desc'),limit(1));const s=await getDocs(q);return s.empty?null:{id:s.docs[0].id,...s.docs[0].data()}}
+export async function analyzeReports(reports: ReportInput[], reportType: string): Promise<AnalysisResult> {
+  if (reports.length === 0) return { success: false, error: '분석할 데이터가 없습니다.' };
+  try {
+    const combinedText = reports
+      .map((report, index) => `=== Source ${index + 1}: ${report.siteName} ===\n\n${report.content}\n\n`)
+      .join('\n');
+    console.log(`🚀 [${reportType}] v17 분석 시작`);
+    const analysisResult = await analyzeWithGemini(combinedText, reportType);
+    return { success: true, data: { analysisResult } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' };
+  }
+}
+
+// DB 함수들
+export async function saveReportToDB(t: string, r: any) {
+  try {
+    const db = getDb();
+    const id = (await addDoc(collection(db, 'reports'), {
+      report_title: t, analysis_result: r, created_at: serverTimestamp(), status: 'completed'
+    })).id;
+    return { success: true, reportId: id };
+  } catch (e) { return { success: false, error: '' }; }
+}
+export async function getAllReports() {
+  const db = getDb();
+  const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data(), created_at: d.data().created_at?.toDate().toISOString() }));
+}
+export async function getReportById(id: string) {
+  const db = getDb();
+  const d = await getDoc(doc(db, 'reports', id));
+  return d.exists() ? { id: d.id, ...d.data() } : null;
+}
+export async function getLatestReport() {
+  const db = getDb();
+  const q = query(collection(db, 'reports'), orderBy('created_at', 'desc'), limit(1));
+  const s = await getDocs(q);
+  return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+}

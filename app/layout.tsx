@@ -23,13 +23,15 @@ export default function RootLayout({
           {children}
         </div>
 
-        {/* 🌟 [수정됨] 이름만 명확하게 표시하는 푸터 */}
-        <footer className="py-8 border-t border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-black text-center">
-          <p className="text-lg text-indigo-600 dark:text-indigo-400 font-bold tracking-wide">
-            Yujin Kang
+        {/* 🌟 최종 수정된 글로벌 푸터 (작고 옅은 회색으로 변경 및 문구 수정) */}
+        <footer className="py-6 border-t border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-black text-center">
+          {/* 제작자 표시: 작게, 회색으로 변경 */}
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-600">
+            Insight Platform by <span className="font-bold">Yujin Kang</span>
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-            © 2025 AI Insight. All rights reserved.
+          {/* 저작권 표시: 간결하게 변경 */}
+          <p className="text-xs text-gray-400 dark:text-gray-700 mt-1">
+            © 2025. All Data Sourced from Public Benchmarks.
           </p>
         </footer>
 

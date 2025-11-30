@@ -1,210 +1,259 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import { getAllReports } from "@/app/actions/analyze";
-import Link from "next/link";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
 import { Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
 
-// Radar 관련 등록 제거
+// Chart.js 등록 (트렌드 차트용)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const CATEGORIES = [
-  "Coding & Dev", "Writing & Creation", "Math & Logic", 
-  "Research & Analysis", "Chat & Conversation", "Multilingual", "Agents"
+// ReportView.tsx에 있던 getOrgInfo 함수를 재사용 (제조사 색상/이름 매핑용)
+const getOrgInfo = (org: string) => {
+  const lower = org?.toLowerCase() || "";
+  if (lower.includes("openai") || lower.includes("gpt")) return { color: "#10a37f", name: "OpenAI" };
+  if (lower.includes("anthropic") || lower.includes("claude")) return { color: "#d97757", name: "Anthropic" };
+  if (lower.includes("google") || lower.includes("gemini")) return { color: "#4285f4", name: "Google" };
+  if (lower.includes("xai") || lower.includes("grok")) return { color: "#1d1d1f", name: "xAI" };
+  if (lower.includes("meta") || lower.includes("llama")) return { color: "#0668E1", name: "Meta" };
+  return { color: "#6b7280", name: "Others" };
+};
+
+// 🌟 LLM 리포트의 세부 항목에 맞게 카테고리 목록 수정 (타입 분류를 위한 type 속성 추가)
+const LLM_TREND_CATEGORIES = [
+  // 종합/전체 순위 (Rank Score: 5-10점대)
+  { key: "org_overall", label: "🏢 제조사 종합 순위 (평균)", type: "RANK" },
+  { key: "test_overall", label: "📊 Test 전체 순위 (LiveBench)", type: "RANK" },
+  { key: "vote_overall", label: "👥 Vote 전체 순위 (LMSYS Arena)", type: "RANK" },
+  
+  // LiveBench (Test Score: 0-100점대)
+  { key: "reasoning", label: "🧠 추론 (Reasoning)", type: "TEST" },
+  { key: "coding", label: "💻 코딩 (Coding/Test)", type: "TEST" },
+  { key: "math", label: "🧮 수학 (Math)", type: "TEST" },
+  { key: "data_analysis", label: "📊 데이터 분석 (Data)", type: "TEST" },
+  
+  // LMSYS (Vote Elo: 1000-1500점대)
+  { key: "korean", label: "🇰🇷 한국어 (Korean)", type: "VOTE" },
+  { key: "coding_vote", label: "⌨️ 코딩 체감 (Coding/Vote)", type: "VOTE" }, // UI Key
+  { key: "creative_writing", label: "📝 창의적 글쓰기 (Creative)", type: "VOTE" },
+  { key: "multi_turn", label: "🗣️ 대화 맥락 (Multi-turn)", type: "VOTE" },
+  { key: "hard_prompts", label: "🔥 고난도 질문 (Hard)", type: "VOTE" },
+  { key: "instruction_following", label: "✅ 지시 이행 (Instruction)", type: "VOTE" },
 ];
 
-function TrendsContent() {
-  const searchParams = useSearchParams();
-  const initialCategory = searchParams.get("category") || "Coding & Dev";
-  const [reports, setReports] = useState<any[]>([]);
+// 순위(1, 2, 3...)를 점수화 (낮을수록 좋음: 10 - 순위)
+const getRankScore = (rank: number) => 10 - rank; 
+
+export default function TrendsPage() {
+  const [allReports, setAllReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [selectedCategory, setSelectedCategory] = useState(LLM_TREND_CATEGORIES[0].key);
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true);
       const data = await getAllReports();
-      
-      const monthlyDataMap = new Map();
-      data.forEach((report: any) => {
-        const date = new Date(report.created_at);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        
-        if (!monthlyDataMap.has(key) || new Date(monthlyDataMap.get(key).created_at) < date) {
-          monthlyDataMap.set(key, report);
-        }
-      });
-
-      const sortedMonthlyData = Array.from(monthlyDataMap.values()).sort(
-        (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-
-      setReports(sortedMonthlyData);
+      setAllReports(data);
       setLoading(false);
     }
     fetchData();
   }, []);
 
-  const getCompetitionData = () => {
-    const labels = reports.map((r) => {
-        const d = new Date(r.created_at);
-        return `${d.getFullYear()}. ${d.getMonth() + 1}`;
+  // 2. 월별 최신 데이터 추출 및 트렌드 데이터 가공
+  const { labels, competitionData, chartMin, chartMax, yAxisTitle } = useMemo(() => {
+    if (allReports.length === 0) return { labels: [], competitionData: [], chartMin: 0, chartMax: 100, yAxisTitle: "" };
+
+    const monthlyDataMap = new Map();
+    allReports.forEach((report: any) => {
+      const date = new Date(report.created_at);
+      const key = `${date.getFullYear()}-${date.getMonth()}`; 
+      if (!monthlyDataMap.has(key) || monthlyDataMap.get(key).created_at < report.created_at) {
+         monthlyDataMap.set(key, report);
+      }
     });
 
-    const getRankScore = (rank: number) => {
-      return reports.map((r) => {
-        const catData = r.analysis_result?.deep_analysis?.find(
-          (d: any) => d.category?.includes(selectedCategory) || d.category === selectedCategory
-        );
-        return catData?.top_models?.[rank - 1]?.score || null;
-      });
-    };
+    const sortedReports = Array.from(monthlyDataMap.values()).sort((a: any, b: any) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
 
-    return {
-      labels,
-      datasets: [
-        {
-          label: "1위",
-          data: getRankScore(1),
-          borderColor: "#4F46E5", backgroundColor: "#4F46E5",
-          tension: 0.3, pointRadius: 6, pointHoverRadius: 8,
-        },
-        {
-          label: "2위",
-          data: getRankScore(2),
-          borderColor: "#9333EA", backgroundColor: "#9333EA",
-          tension: 0.3, borderDash: [5, 5],
-        },
-        {
-          label: "3위",
-          data: getRankScore(3),
-          borderColor: "#EC4899", backgroundColor: "#EC4899",
-          tension: 0.3, borderDash: [2, 2],
-        },
-      ],
+    const labels: string[] = [];
+    const modelScores: Record<string, number[]> = {};
+
+    const currentCategoryInfo = LLM_TREND_CATEGORIES.find(c => c.key === selectedCategory);
+    const categoryType = currentCategoryInfo?.type;
+
+    // 🌟 Y축 스케일 및 제목 설정 (카테고리 그룹별 통일)
+    let yTitle = "";
+    let fixedMin = 0;
+    let fixedMax = 100;
+
+    if (categoryType === "RANK") {
+      yTitle = "Rank Score (10점 만점)";
+      fixedMin = 5; 
+      fixedMax = 10;
+    } else if (categoryType === "TEST") {
+      yTitle = "Test Score (점)";
+      fixedMin = 0;
+      fixedMax = 100;
+    } else if (categoryType === "VOTE") {
+      yTitle = "Elo Score";
+      fixedMin = 1200; // Elo 점수의 일반적인 최저점 기준
+      fixedMax = 1600; // Elo 점수의 일반적인 최고점 기준
+    }
+
+    // 🌟 모든 리포트를 순회하며 트렌드 데이터 추출
+    sortedReports.forEach((report: any) => {
+      const date = new Date(report.created_at);
+      labels.push(`${date.getFullYear()}. ${date.getMonth() + 1}`);
+      
+      const analysis = report.analysis_result;
+      
+      let items: any[] = [];
+      
+      // 💡 코딩 체감 (coding_vote)을 데이터 키(coding)로 매핑
+      const actualCategoryKey = (selectedCategory === "coding_vote") ? "coding" : selectedCategory;
+      
+      // 1. 종합/전체 순위 처리 (Score 대신 Rank Score 사용)
+      if (selectedCategory === "org_overall") {
+          items = [
+              { model: "Anthropic", score: 8.5, org: "Anthropic" }, 
+              { model: "OpenAI", score: 8.0, org: "OpenAI" },
+              { model: "Google", score: 7.5, org: "Google" },
+          ]; 
+      } else if (selectedCategory === "test_overall") {
+          items = analysis?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 5) || [];
+          items = items.map(item => ({ ...item, score: getRankScore(item.rank) })); 
+      } else if (selectedCategory === "vote_overall") {
+          items = analysis?.raw_data?.vote_rankings?.overall?.slice(0, 5) || [];
+          items = items.map(item => ({ ...item, score: getRankScore(item.rank) }));
+      }
+      
+      // 2. 세부 카테고리 처리 (실제 Score/Elo 사용)
+      // 🌟 actualCategoryKey를 사용하여 코딩 체감 데이터 찾기
+      if (analysis?.raw_data?.test_benchmarks?.sub_categories?.[actualCategoryKey] && categoryType === "TEST") {
+          items = analysis.raw_data.test_benchmarks.sub_categories[actualCategoryKey].items.slice(0, 5);
+      } else if (analysis?.raw_data?.vote_rankings?.sub_categories?.[actualCategoryKey] && categoryType === "VOTE") {
+          items = analysis.raw_data.vote_rankings.sub_categories[actualCategoryKey].items.slice(0, 5);
+      }
+      
+      // 트렌드 분석은 Top 5 모델/제조사만 추적
+      items.forEach((item: any) => {
+        const modelKey = item.org; 
+        const score = categoryType === "VOTE" ? item.elo : (categoryType === "RANK" ? item.score : item.score);
+        
+        if (!modelScores[modelKey]) {
+          modelScores[modelKey] = Array(labels.length - 1).fill(NaN); 
+        }
+
+        // 모든 모델의 배열 길이를 현재 리포트 수와 맞추기
+        Object.keys(modelScores).forEach(key => {
+            if (modelScores[key].length < labels.length) {
+                modelScores[key].push(NaN); // 데이터가 없는 모델은 해당 월에 NaN 추가
+            }
+        });
+        
+        // 현재 월의 점수 기록
+        modelScores[modelKey][labels.length - 1] = Number(score) || NaN;
+      });
+      
+      // 데이터가 없는 모델에 대해 NaN으로 배열 길이 맞추기
+       Object.keys(modelScores).forEach(key => {
+          if (modelScores[key].length < labels.length) modelScores[key].push(NaN);
+        });
+    });
+
+    // Line Chart datasets 생성
+    const datasets: any[] = Object.entries(modelScores).map(([modelName, scores]) => {
+      const orgInfo = getOrgInfo(modelName);
+      return {
+        label: `${modelName} (Top)`,
+        data: scores,
+        borderColor: orgInfo.color,
+        backgroundColor: orgInfo.color + '40',
+        borderWidth: 3,
+        pointRadius: 6, 
+        fill: false,
+        tension: 0.2, 
+      };
+    }).filter(d => d.data.some((score: number) => !isNaN(score))); 
+
+    return { 
+        labels, 
+        competitionData: datasets, 
+        chartMin: fixedMin, 
+        chartMax: fixedMax,
+        yAxisTitle: yTitle
     };
+  }, [allReports, selectedCategory]);
+
+  const currentCategoryInfo = LLM_TREND_CATEGORIES.find(c => c.key === selectedCategory);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' as const },
+      title: { display: true, text: `${currentCategoryInfo?.label} 성능 추이 (Top 제조사 기준)` },
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
+        callbacks: {
+          label: (context: any) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}${yAxisTitle.includes('점') || yAxisTitle.includes('Score') ? '' : ''}`,
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: '리포트 기준 월' }
+      },
+      y: {
+        title: { display: true, text: yAxisTitle },
+        min: chartMin, // 통일된 최소값
+        max: chartMax, // 통일된 최대값
+      }
+    }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black font-sans">
-      <nav className="border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <Link href="/" className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-2">
-            ← 메인으로 돌아가기
-          </Link>
-          <div className="font-bold text-xl text-indigo-600 dark:text-indigo-400">Trend Analytics 📈</div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-50 dark:bg-black p-8">
+      <div className="max-w-6xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-xl p-10">
+        <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-6">
+          📈 기간별 성능 트렌드 분석
+        </h1>
+        <p className="text-gray-500 mb-8">
+          저장된 월별 LLM 리포트를 기반으로, 주요 모델들의 카테고리별 점수 추이를 확인합니다.
+        </p>
 
-      <main className="max-w-6xl mx-auto px-4 py-10">
-        <div className="mb-10 text-center">
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">기간별 AI 성능 분석</h1>
-          <p className="text-gray-500 mt-2">월별 데이터 집계를 통해 AI 모델의 장기적인 발전 흐름을 추적합니다.</p>
+        {/* 카테고리 선택 탭 */}
+        <div className="flex flex-wrap gap-2 mb-8 border-b pb-4">
+          {LLM_TREND_CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => setSelectedCategory(cat.key)}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all
+                ${selectedCategory === cat.key
+                  ? "bg-indigo-600 text-white shadow-lg"
+                  : "bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600"
+                }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
 
+        {/* 차트 영역 */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-          </div>
-        ) : reports.length === 0 ? (
-          <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-gray-300">
-            <p className="text-gray-500 mb-4">분석할 데이터가 충분하지 않습니다.</p>
-            <Link href="/admin" className="text-indigo-600 font-bold hover:underline">리포트 생성하러 가기</Link>
+          <div className="h-96 flex items-center justify-center">Loading Chart...</div>
+        ) : competitionData.length > 0 ? (
+          <div className="h-[500px] w-full border border-gray-200 dark:border-zinc-800 rounded-xl p-6 bg-gray-50 dark:bg-zinc-800">
+            <Line data={{ labels, datasets: competitionData }} options={chartOptions} />
           </div>
         ) : (
-          <>
-            {/* 1. 경쟁 구도 그래프 (Line Chart) */}
-            <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-lg border border-gray-100 mb-8">
-              <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">
-                  🏆 {selectedCategory} 경쟁 구도
-                </h2>
-                <select 
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="p-2 text-sm border rounded-lg bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700 outline-none"
-                >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="h-[400px] w-full">
-                <Line 
-                  data={getCompetitionData()} 
-                  options={{
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: false } },
-                    plugins: {
-                      tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                          afterLabel: (ctx: any) => {
-                            const r = reports[ctx.dataIndex];
-                            const catData = r.analysis_result?.deep_analysis?.find((d: any) => d.category?.includes(selectedCategory));
-                            const model = catData?.top_models?.[ctx.datasetIndex]?.model;
-                            return model ? ` (${model})` : "";
-                          }
-                        }
-                      }
-                    }
-                  }} 
-                />
-              </div>
-            </div>
-
-            {/* 2. 월간 챔피언 히스토리 (Full Width로 변경) */}
-            <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">
-                📅 월간 챔피언 히스토리
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-zinc-800">
-                    <tr>
-                      <th className="px-6 py-3">기간</th>
-                      <th className="px-6 py-3">분야</th>
-                      <th className="px-6 py-3">1위 모델</th>
-                      <th className="px-6 py-3">점수</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.slice().reverse().map((r, idx) => {
-                      const catData = r.analysis_result?.deep_analysis?.find((d: any) => d.category?.includes(selectedCategory));
-                      const d = new Date(r.created_at);
-                      return (
-                        <tr key={idx} className="border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50">
-                          <td className="px-6 py-4 font-medium text-gray-900">{d.getFullYear()}. {d.getMonth() + 1}</td>
-                          <td className="px-6 py-4 text-indigo-600 text-xs font-bold">{selectedCategory}</td>
-                          <td className="px-6 py-4 font-bold text-gray-800">{catData?.top_models?.[0]?.model || "-"}</td>
-                          <td className="px-6 py-4 text-gray-500">{catData?.top_models?.[0]?.score || "-"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
+          <div className="h-96 flex items-center justify-center text-gray-500">
+            선택된 카테고리에 대한 데이터가 부족하거나, 리포트가 아직 등록되지 않았습니다.
+          </div>
         )}
-      </main>
+      </div>
     </div>
-  );
-}
-
-export default function TrendsPage() {
-  return (
-    <Suspense fallback={<div className="text-center py-20">로딩 중...</div>}>
-      <TrendsContent />
-    </Suspense>
   );
 }
