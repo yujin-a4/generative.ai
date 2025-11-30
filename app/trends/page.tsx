@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react"; // 🌟 Suspense 추가
 import { getAllReports } from "@/app/actions/analyze";
 import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
-import TrendBackButton from "@/app/components/TrendBackButton"; // 🌟 [추가] 뒤로가기 버튼 Import
+import TrendBackButton from "@/app/components/TrendBackButton";
 
-// Chart.js 등록 (트렌드 차트용)
+// Chart.js 등록
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-// ReportView.tsx에 있던 getOrgInfo 함수를 재사용 (제조사 색상/이름 매핑용)
 const getOrgInfo = (org: string) => {
   const lower = org?.toLowerCase() || "";
   if (lower.includes("openai") || lower.includes("gpt")) return { color: "#10a37f", name: "OpenAI" };
@@ -20,29 +19,22 @@ const getOrgInfo = (org: string) => {
   return { color: "#6b7280", name: "Others" };
 };
 
-// 🌟 LLM 리포트의 세부 항목에 맞게 카테고리 목록 수정 (타입 분류를 위한 type 속성 추가)
 const LLM_TREND_CATEGORIES = [
-  // 종합/전체 순위 (Rank Score: 5-10점대)
   { key: "org_overall", label: "🏢 제조사 종합 순위 (평균)", type: "RANK" },
   { key: "test_overall", label: "📊 Test 전체 순위 (LiveBench)", type: "RANK" },
   { key: "vote_overall", label: "👥 Vote 전체 순위 (LMSYS Arena)", type: "RANK" },
-  
-  // LiveBench (Test Score: 0-100점대)
   { key: "reasoning", label: "🧠 추론 (Reasoning)", type: "TEST" },
   { key: "coding", label: "💻 코딩 (Coding/Test)", type: "TEST" },
   { key: "math", label: "🧮 수학 (Math)", type: "TEST" },
   { key: "data_analysis", label: "📊 데이터 분석 (Data)", type: "TEST" },
-  
-  // LMSYS (Vote Elo: 1000-1500점대)
   { key: "korean", label: "🇰🇷 한국어 (Korean)", type: "VOTE" },
-  { key: "coding_vote", label: "⌨️ 코딩 체감 (Coding/Vote)", type: "VOTE" }, // UI Key
+  { key: "coding_vote", label: "⌨️ 코딩 체감 (Coding/Vote)", type: "VOTE" },
   { key: "creative_writing", label: "📝 창의적 글쓰기 (Creative)", type: "VOTE" },
   { key: "multi_turn", label: "🗣️ 대화 맥락 (Multi-turn)", type: "VOTE" },
   { key: "hard_prompts", label: "🔥 고난도 질문 (Hard)", type: "VOTE" },
   { key: "instruction_following", label: "✅ 지시 이행 (Instruction)", type: "VOTE" },
 ];
 
-// 순위(1, 2, 3...)를 점수화 (낮을수록 좋음: 10 - 순위)
 const getRankScore = (rank: number) => 10 - rank; 
 
 export default function TrendsPage() {
@@ -60,7 +52,6 @@ export default function TrendsPage() {
     fetchData();
   }, []);
 
-  // 2. 월별 최신 데이터 추출 및 트렌드 데이터 가공
   const { labels, competitionData, chartMin, chartMax, yAxisTitle } = useMemo(() => {
     if (allReports.length === 0) return { labels: [], competitionData: [], chartMin: 0, chartMax: 100, yAxisTitle: "" };
 
@@ -83,7 +74,6 @@ export default function TrendsPage() {
     const currentCategoryInfo = LLM_TREND_CATEGORIES.find(c => c.key === selectedCategory);
     const categoryType = currentCategoryInfo?.type;
 
-    // 🌟 Y축 스케일 및 제목 설정 (카테고리 그룹별 통일)
     let yTitle = "";
     let fixedMin = 0;
     let fixedMax = 100;
@@ -98,11 +88,10 @@ export default function TrendsPage() {
       fixedMax = 100;
     } else if (categoryType === "VOTE") {
       yTitle = "Elo Score";
-      fixedMin = 1200; // Elo 점수의 일반적인 최저점 기준
-      fixedMax = 1600; // Elo 점수의 일반적인 최고점 기준
+      fixedMin = 1200; 
+      fixedMax = 1600; 
     }
 
-    // 🌟 모든 리포트를 순회하며 트렌드 데이터 추출
     sortedReports.forEach((report: any) => {
       const date = new Date(report.created_at);
       labels.push(`${date.getFullYear()}. ${date.getMonth() + 1}`);
@@ -110,11 +99,8 @@ export default function TrendsPage() {
       const analysis = report.analysis_result;
       
       let items: any[] = [];
-      
-      // 💡 코딩 체감 (coding_vote)을 데이터 키(coding)로 매핑
       const actualCategoryKey = (selectedCategory === "coding_vote") ? "coding" : selectedCategory;
       
-      // 1. 종합/전체 순위 처리 (Score 대신 Rank Score 사용)
       if (selectedCategory === "org_overall") {
           items = [
               { model: "Anthropic", score: 8.5, org: "Anthropic" }, 
@@ -129,15 +115,12 @@ export default function TrendsPage() {
           items = items.map(item => ({ ...item, score: getRankScore(item.rank) }));
       }
       
-      // 2. 세부 카테고리 처리 (실제 Score/Elo 사용)
-      // 🌟 actualCategoryKey를 사용하여 코딩 체감 데이터 찾기
       if (analysis?.raw_data?.test_benchmarks?.sub_categories?.[actualCategoryKey] && categoryType === "TEST") {
           items = analysis.raw_data.test_benchmarks.sub_categories[actualCategoryKey].items.slice(0, 5);
       } else if (analysis?.raw_data?.vote_rankings?.sub_categories?.[actualCategoryKey] && categoryType === "VOTE") {
           items = analysis.raw_data.vote_rankings.sub_categories[actualCategoryKey].items.slice(0, 5);
       }
       
-      // 트렌드 분석은 Top 5 모델/제조사만 추적
       items.forEach((item: any) => {
         const modelKey = item.org; 
         const score = categoryType === "VOTE" ? item.elo : (categoryType === "RANK" ? item.score : item.score);
@@ -146,24 +129,20 @@ export default function TrendsPage() {
           modelScores[modelKey] = Array(labels.length - 1).fill(NaN); 
         }
 
-        // 모든 모델의 배열 길이를 현재 리포트 수와 맞추기
         Object.keys(modelScores).forEach(key => {
             if (modelScores[key].length < labels.length) {
-                modelScores[key].push(NaN); // 데이터가 없는 모델은 해당 월에 NaN 추가
+                modelScores[key].push(NaN); 
             }
         });
         
-        // 현재 월의 점수 기록
         modelScores[modelKey][labels.length - 1] = Number(score) || NaN;
       });
       
-      // 데이터가 없는 모델에 대해 NaN으로 배열 길이 맞추기
        Object.keys(modelScores).forEach(key => {
           if (modelScores[key].length < labels.length) modelScores[key].push(NaN);
         });
     });
 
-    // Line Chart datasets 생성
     const datasets: any[] = Object.entries(modelScores).map(([modelName, scores]) => {
       const orgInfo = getOrgInfo(modelName);
       return {
@@ -209,8 +188,8 @@ export default function TrendsPage() {
       },
       y: {
         title: { display: true, text: yAxisTitle },
-        min: chartMin, // 통일된 최소값
-        max: chartMax, // 통일된 최대값
+        min: chartMin, 
+        max: chartMax, 
       }
     }
   };
@@ -219,9 +198,11 @@ export default function TrendsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-xl p-10">
         
-        {/* 🌟 [추가] 뒤로가기 버튼 */}
+        {/* 🌟 [수정] Suspense로 감싸서 빌드 에러 해결 */}
         <div className="mb-4">
-          <TrendBackButton />
+          <Suspense fallback={<div className="h-10 bg-gray-100 rounded animate-pulse"></div>}>
+            <TrendBackButton />
+          </Suspense>
         </div>
 
         <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-6">
@@ -231,7 +212,6 @@ export default function TrendsPage() {
           저장된 월별 LLM 리포트를 기반으로, 주요 모델들의 카테고리별 점수 추이를 확인합니다.
         </p>
 
-        {/* 카테고리 선택 탭 */}
         <div className="flex flex-wrap gap-2 mb-8 border-b pb-4">
           {LLM_TREND_CATEGORIES.map((cat) => (
             <button
@@ -248,7 +228,6 @@ export default function TrendsPage() {
           ))}
         </div>
 
-        {/* 차트 영역 */}
         {loading ? (
           <div className="h-96 flex items-center justify-center">Loading Chart...</div>
         ) : competitionData.length > 0 ? (
