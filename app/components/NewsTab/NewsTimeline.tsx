@@ -4,45 +4,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRecentNews, NewsArticle } from "@/app/lib/newsService";
 import NewsCard from "./NewsCard";
-// import { getExtendedSearchTerms } from "@/app/lib/searchUtils"; // 검색 기능 제거됨
 import NewsLoading from "./NewsLoading";
 import SummaryModal from "./SummaryModal";
-
-// 🌟 [수정] 모든 유틸리티 함수를 모듈 레벨에 정의하여 스코프 오류 해결
-
-// "2025년 11월" 형식
-function getMonthLabel(date: Date): string {
-  return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long" });
-}
-
-// "4째주" 형식
-function getWeekLabel(date: Date): string {
-  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-  const firstDayWeekday = firstDayOfMonth.getDay();
-  const weekNumber = Math.ceil((date.getDate() + firstDayWeekday) / 7);
-  const weekNames = ["", "1째주", "2째주", "3째주", "4째주", "5째주", "6째주"];
-  return weekNames[weekNumber] || `${weekNumber}째주`;
-}
-
-// "11월 4주차" 형식 (DB 저장용)
-function getWeekLabelForDB(date: Date): string {
-  const month = date.getMonth() + 1;
-  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-  const firstDayWeekday = firstDayOfMonth.getDay();
-  const weekNumber = Math.ceil((date.getDate() + firstDayWeekday) / 7);
-  return `${month}월 ${weekNumber}주차`;
-}
-
-// 정렬용 키
-function getMonthSortKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function getWeekSortKey(date: Date): number {
-  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-  const firstDayWeekday = firstDayOfMonth.getDay();
-  return Math.ceil((date.getDate() + firstDayWeekday) / 7);
-}
+import { getMonthWeeks, getMonthLabel, getMonthSortKey } from "@/app/lib/weekUtils";
 
 interface NewsTimelineProps {
   refreshKey: number;
@@ -55,6 +19,8 @@ interface WeekGroup {
   label: string;
   dbLabel: string;
   sortKey: number;
+  startDate: Date;
+  endDate: Date;
   news: NewsArticle[];
 }
 
@@ -64,6 +30,14 @@ interface MonthGroup {
   year: number;
   month: number;
   weeks: WeekGroup[];
+}
+
+// ✅ [추가] 로컬 타임존 기준 YYYY-MM-DD 문자열 생성 함수
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export default function NewsTimeline({ 
@@ -83,6 +57,8 @@ export default function NewsTimeline({
     isOpen: boolean;
     type: "weekly" | "monthly";
     weekLabel?: string;
+    weekStartDate?: string;
+    weekEndDate?: string;
     year?: number;
     month?: number;
   }>({ isOpen: false, type: "weekly" });
@@ -93,48 +69,75 @@ export default function NewsTimeline({
     }
   }, [refreshKey, refetch]);
 
-  const newsForGrouping = allNews; // 검색어 필터링 로직 제거 (allNews를 직접 사용)
-
-  // 월별 → 주별 그룹핑
+  // 월별/주별 그룹핑 로직
   const groupedByMonth: Record<string, { 
     label: string; 
     sortKey: string; 
     year: number;
     month: number;
-    weeks: Record<string, WeekGroup> 
+    weekGroups: Map<number, WeekGroup>;
+    monthWeeksInfo: any[];
   }> = {};
 
-  newsForGrouping.forEach((news) => {
+  // 1단계: 월별로 먼저 그룹핑하고 각 월의 주차 정보 생성
+  allNews.forEach((news) => {
     const targetDate = news.publishedAt || news.createdAt;
     if (!targetDate) return;
     
     const date = targetDate.toDate();
-    const monthLabel = getMonthLabel(date); // 👈 함수 사용
-    const monthSortKey = getMonthSortKey(date); // 👈 함수 사용
-    const weekLabel = getWeekLabel(date); // 👈 함수 사용
-    const weekDbLabel = getWeekLabelForDB(date); // 👈 함수 사용
-    const weekSortKey = getWeekSortKey(date); // 👈 함수 사용
+    const monthLabel = getMonthLabel(date);
+    const monthSortKey = getMonthSortKey(date);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
 
     if (!groupedByMonth[monthLabel]) {
       groupedByMonth[monthLabel] = { 
         label: monthLabel, 
         sortKey: monthSortKey, 
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        weeks: {} 
+        year,
+        month,
+        weekGroups: new Map(),
+        monthWeeksInfo: getMonthWeeks(year, month)
       };
     }
+  });
 
-    if (!groupedByMonth[monthLabel].weeks[weekLabel]) {
-      groupedByMonth[monthLabel].weeks[weekLabel] = { 
-        label: weekLabel, 
-        dbLabel: weekDbLabel,
-        sortKey: weekSortKey, 
-        news: [] 
-      };
+  // 2단계: 각 월의 주차 정보를 기반으로 WeekGroup 초기화
+  Object.values(groupedByMonth).forEach(monthData => {
+    monthData.monthWeeksInfo.forEach(weekInfo => {
+      monthData.weekGroups.set(weekInfo.weekNumber, {
+        label: weekInfo.weekLabel,
+        dbLabel: weekInfo.weekDbLabel,
+        sortKey: weekInfo.weekNumber,
+        startDate: new Date(weekInfo.startDate),
+        endDate: new Date(weekInfo.endDate),
+        news: []
+      });
+    });
+  });
+
+  // 3단계: 뉴스를 해당 주에 배치
+  allNews.forEach((news) => {
+    const targetDate = news.publishedAt || news.createdAt;
+    if (!targetDate) return;
+    
+    const date = targetDate.toDate();
+    const monthLabel = getMonthLabel(date);
+    const monthData = groupedByMonth[monthLabel];
+    
+    if (!monthData) return;
+
+    // 해당 날짜가 속한 주 찾기
+    const weekInfo = monthData.monthWeeksInfo.find(w => 
+      date >= w.startDate && date <= w.endDate
+    );
+
+    if (weekInfo) {
+      const weekGroup = monthData.weekGroups.get(weekInfo.weekNumber);
+      if (weekGroup) {
+        weekGroup.news.push(news);
+      }
     }
-
-    groupedByMonth[monthLabel].weeks[weekLabel].news.push(news);
   });
 
   // 정렬된 월별 데이터
@@ -145,7 +148,9 @@ export default function NewsTimeline({
       sortKey: month.sortKey,
       year: month.year,
       month: month.month,
-      weeks: Object.values(month.weeks).sort((a, b) => b.sortKey - a.sortKey)
+      weeks: Array.from(month.weekGroups.values())
+        .filter(week => week.news.length > 0)
+        .sort((a, b) => b.sortKey - a.sortKey)
     }));
 
   // 첫 번째 월은 기본 펼침
@@ -168,15 +173,31 @@ export default function NewsTimeline({
     });
   };
 
-  // 요약 모달 열기
-  const openWeeklySummary = (weekDbLabel: string) => {
+  // ✅ [핵심 수정] 요약 모달 열기 - 주간 (타임존 문제 해결)
+  const openWeeklySummary = (weekDbLabel: string, startDate: Date, endDate: Date) => {
+    // 로컬 타임존 기준으로 날짜 문자열 생성 (toISOString 사용하지 않음!)
+    const startDateStr = formatLocalDate(startDate);
+    const endDateStr = formatLocalDate(endDate);
+    
+    console.log('📅 주간요약 열기:', {
+      weekDbLabel,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      // 디버깅용: 원본 Date 객체 정보
+      startDateRaw: `${startDate.getFullYear()}-${startDate.getMonth()+1}-${startDate.getDate()}`,
+      endDateRaw: `${endDate.getFullYear()}-${endDate.getMonth()+1}-${endDate.getDate()}`
+    });
+    
     setSummaryModal({
       isOpen: true,
       type: "weekly",
       weekLabel: weekDbLabel,
+      weekStartDate: startDateStr,
+      weekEndDate: endDateStr,
     });
   };
 
+  // 요약 모달 열기 - 월간
   const openMonthlySummary = (year: number, month: number) => {
     setSummaryModal({
       isOpen: true,
@@ -252,20 +273,20 @@ export default function NewsTimeline({
                             {week.label}
                           </h4>
                           <p className="text-xs text-gray-500">
-                            {week.news.length}개의 뉴스
+                            {week.news.length}개의 뉴스 • {week.startDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ~ {week.endDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
                           </p>
                         </div>
                         
                         {/* 주간 요약 버튼 */}
                         <button
-                          onClick={() => openWeeklySummary(week.dbLabel)}
+                          onClick={() => openWeeklySummary(week.dbLabel, week.startDate, week.endDate)}
                           className="px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                         >
                           📊 주간요약
                         </button>
                       </div>
 
-                      {/* 해당 주 뉴스 카드들 - 한 줄에 4개로 수정 */}
+                      {/* 해당 주 뉴스 카드들 */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {week.news.map((newsItem) => (
                           <NewsCard 
@@ -275,7 +296,7 @@ export default function NewsTimeline({
                             onEdit={onNewsEdit}
                             refreshList={onRefresh}
                             hideSummary={true}
-                            isTimelineView={true} // 👈 이 줄이 추가되었습니다.
+                            isTimelineView={true}
                           />
                         ))}
                       </div>
@@ -294,6 +315,8 @@ export default function NewsTimeline({
         onClose={() => setSummaryModal({ ...summaryModal, isOpen: false })}
         type={summaryModal.type}
         weekLabel={summaryModal.weekLabel}
+        weekStartDate={summaryModal.weekStartDate}
+        weekEndDate={summaryModal.weekEndDate}
         year={summaryModal.year}
         month={summaryModal.month}
       />

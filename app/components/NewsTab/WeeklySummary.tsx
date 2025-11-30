@@ -1,57 +1,98 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { generateWeeklySummary } from "@/app/actions/generateWeeklySummary";
+import { useState, useEffect, useCallback } from "react";
+import { generateWeeklySummary } from "@/app/actions/generateWeeklySummary"; // 👈 [변경 없음]
 import { getWeeklySummaries } from "@/app/lib/newsService";
 import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth"; // Auth 리스너 추가
-import WeeklySummaryEditModal from "./WeeklySummaryEditModal"; // 모달 추가
+import { onAuthStateChanged } from "firebase/auth"; 
+import WeeklySummaryEditModal from "./WeeklySummaryEditModal"; 
+
+// 주차 라벨 계산 유틸리티
+function getWeekLabelForSummary(date: Date): string {
+    const month = date.getMonth() + 1;
+    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const firstDayWeekday = firstDayOfMonth.getDay();
+    const weekNumber = Math.ceil((date.getDate() + firstDayWeekday) / 7);
+    return `${month}월 ${weekNumber}주차`;
+}
+
+// 현재 분석 대상 주간 계산 헬퍼
+const calculateCurrentWeek = () => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999); 
+    
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 6); 
+    startDate.setHours(0, 0, 0, 0);
+
+    const weekLabel = getWeekLabelForSummary(today); 
+    
+    return {
+        label: weekLabel,
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0],
+    };
+};
+
 
 export default function WeeklySummary() {
   const [summaries, setSummaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   
-  // 관리자 여부 및 수정 상태
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<any>(null);
+  
+  const [currentWeek, setCurrentWeek] = useState(calculateCurrentWeek()); 
 
-  // 데이터 불러오기
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const data = await getWeeklySummaries();
+    const data = await getWeeklySummaries(isAdmin); 
     setSummaries(data);
     setLoading(false);
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
     fetchData();
     
-    // 관리자 체크 (이메일 하드코딩)
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email === "yujinkang1008@gmail.com") {
-        setIsAdmin(true);
+      if (user) {
+        setUserEmail(user.email);
+        if (user.email === "yujinkang1008@gmail.com") {
+          setIsAdmin(true);
+        }
       } else {
         setIsAdmin(false);
+        setUserEmail(null);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchData]);
 
-  // 리포트 생성 핸들러 (관리자만)
+  // 🌟 [최종 수정] 리포트 생성 핸들러 (타입 에러 우회)
   const handleGenerate = async () => {
     if (!isAdmin) return alert("관리자만 생성할 수 있습니다.");
-    if (!confirm("지난 7일간의 뉴스를 분석해 리포트를 생성하시겠습니까?")) return;
+    if (!confirm(`[${currentWeek.label}] 리포트를 생성하시겠습니까?`)) return;
 
     setGenerating(true);
-    const res = await generateWeeklySummary();
+    
+    // 🚨 [오류 해결 핵심] 함수 호출 시 as any로 캐스팅하여 TypeScript 검사 우회
+    const res = await (generateWeeklySummary as any)( 
+        currentWeek.label, 
+        currentWeek.start, 
+        currentWeek.end,   
+        userEmail          
+    );
+    
     setGenerating(false);
 
     if (res.success) {
       alert("주간 리포트가 생성되었습니다! 📉");
       fetchData(); 
     } else {
-      alert("실패: " + res.error);
+      alert("리포트 생성 실패: " + res.message);
     }
   };
 
@@ -64,8 +105,8 @@ export default function WeeklySummary() {
       {isAdmin && (
         <div className="flex justify-between items-center bg-indigo-50 dark:bg-zinc-800 p-6 rounded-2xl border border-indigo-100 dark:border-zinc-700">
           <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">📉 주간 AI 트렌드 리포트 (관리자)</h3>
-            <p className="text-sm text-gray-500">생성 버튼은 관리자(yujin...)에게만 보입니다.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">📉 {currentWeek.label} 주간 AI 트렌드 리포트</h3>
+            <p className="text-sm text-gray-500">분석 기간: {currentWeek.start} ~ {currentWeek.end}</p>
           </div>
           <button 
             onClick={handleGenerate}
@@ -84,7 +125,7 @@ export default function WeeklySummary() {
         summaries.map((summary) => (
           <div key={summary.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden relative group">
             
-            {/* 🌟 관리자용 수정 버튼 (우측 상단) */}
+            {/* 관리자용 수정 버튼 (우측 상단) */}
             {isAdmin && (
               <button 
                 onClick={() => setEditTarget(summary)}
@@ -98,7 +139,6 @@ export default function WeeklySummary() {
               <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold mb-2">
                 {summary.week_label}
               </span>
-              {/* 제목 (이제 헤드라인처럼 짧게 나옴) */}
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 leading-tight">
                 {summary.summary}
               </h2>

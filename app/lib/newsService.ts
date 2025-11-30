@@ -122,10 +122,48 @@ import {
   }
   
   // =====================
-  // 주간 요약 관련
+  // 주간 요약 관련 (신규 추가된 헬퍼)
   // =====================
   
-  // 주간 요약 목록 가져오기 (공개된 것만 or 관리자는 전체)
+  // 🌟 [추가] getNewsForSummary 함수: 특정 기간의 뉴스 데이터를 Gemini에게 전달하기 위해 조회
+  export async function getNewsForSummary(startDate: Date, endDate: Date) {
+    try {
+      const q = query(
+        collection(db, "news"),
+        where("publishedAt", ">=", Timestamp.fromDate(startDate)),
+        where("publishedAt", "<=", Timestamp.fromDate(endDate)),
+        orderBy("publishedAt", "asc")
+      );
+      const querySnapshot = await getDocs(q);
+      // Gemini의 인풋을 최소화하기 위해 필요한 필드만 반환
+      return querySnapshot.docs.map(doc => ({
+        title: doc.data().title,
+        shortSummary: doc.data().shortSummary,
+        tags: doc.data().tags,
+        category: doc.data().category,
+      }));
+    } catch (error) {
+      console.error("Error fetching news for summary:", error);
+      return [];
+    }
+  }
+
+  // 🌟 [추가] addWeeklySummary 함수: Gemini가 생성한 최종 리포트 저장
+  export async function addWeeklySummary(summaryData: any) {
+    try {
+      const docRef = await addDoc(collection(db, "weekly_summaries"), {
+        ...summaryData,
+        created_at: serverTimestamp(),
+        isPublished: false, // 기본적으로 비공개
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error("Error adding weekly summary:", error);
+      throw error;
+    }
+  }
+  
+  // 주간 요약 목록 가져오기 (기존 함수)
   export async function getWeeklySummaries(includeUnpublished = false) {
     try {
       let q;
@@ -156,7 +194,7 @@ import {
     }
   }
 
-  // 특정 주차의 주간 요약 가져오기
+  // 특정 주차의 주간 요약 가져오기 (기존 함수)
   export async function getWeeklySummaryByWeek(weekLabel: string, includeUnpublished = false) {
     try {
       let q;
@@ -185,7 +223,7 @@ import {
     }
   }
   
-  // 주간 요약 수정하기
+  // 주간 요약 수정하기 (기존 함수)
   export async function updateWeeklySummary(id: string, data: any) {
     try {
       const summaryRef = doc(db, "weekly_summaries", id);
@@ -196,7 +234,7 @@ import {
     }
   }
 
-  // 주간 요약 공개하기
+  // 주간 요약 공개하기 (기존 함수)
   export async function publishWeeklySummary(id: string) {
     try {
       const summaryRef = doc(db, "weekly_summaries", id);
@@ -207,7 +245,7 @@ import {
     }
   }
 
-  // 주간 요약 삭제하기
+  // 주간 요약 삭제하기 (기존 함수)
   export async function deleteWeeklySummary(id: string) {
     try {
       await deleteDoc(doc(db, "weekly_summaries", id));
@@ -218,7 +256,7 @@ import {
   }
 
   // =====================
-  // 월간 요약 관련
+  // 월간 요약 관련 (기존 함수)
   // =====================
 
   // 월간 요약 목록 가져오기
@@ -314,7 +352,7 @@ import {
   }
 
   // =====================
-  // 좋아요 / 북마크
+  // 좋아요 / 북마크 (기존 함수)
   // =====================
 
   // 좋아요 토글
@@ -322,7 +360,7 @@ import {
     try {
       const newsRef = doc(db, "news", newsId);
       const isLiked = currentLikedBy.includes(userId);
-  
+    
       if (isLiked) {
         await updateDoc(newsRef, {
             likedBy: arrayRemove(userId),
@@ -345,7 +383,7 @@ import {
     try {
       const newsRef = doc(db, "news", newsId);
       const isBookmarked = currentBookmarkedBy.includes(userId);
-  
+    
       if (isBookmarked) {
         await updateDoc(newsRef, {
             bookmarkedBy: arrayRemove(userId)

@@ -6,25 +6,47 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp, 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function generateMonthlySummary(year: number, month: number) {
+/**
+ * 월간 리포트 생성
+ * @param monthLabel - 월 라벨 (예: "2025년 11월") - 필수 ✅ 새로 추가
+ * @param year - 연도 (예: 2025)
+ * @param month - 월 (예: 11)
+ */
+export async function generateMonthlySummary(
+  monthLabel: string,  // ✅ 첫 번째 파라미터로 추가
+  year: number, 
+  month: number
+) {
   try {
     // 1. 해당 월의 시작/끝 날짜
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(year, month, 0);
+    endDate.setHours(23, 59, 59, 999);
 
+    console.log(`[MONTHLY] 📅 분석 기간: ${startDate.toLocaleDateString()} ~ ${endDate.toLocaleDateString()}`);
+    console.log(`[MONTHLY] 📊 월 라벨: ${monthLabel}`);
+
+    // publishedAt으로 쿼리
     const newsRef = collection(db, "news");
     const q = query(
       newsRef,
-      where("createdAt", ">=", Timestamp.fromDate(startDate)),
-      where("createdAt", "<=", Timestamp.fromDate(endDate)),
-      orderBy("createdAt", "desc")
+      where("publishedAt", ">=", Timestamp.fromDate(startDate)),
+      where("publishedAt", "<=", Timestamp.fromDate(endDate)),
+      orderBy("publishedAt", "desc")
     );
 
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {
-      return { success: false, error: "해당 월에 분석할 뉴스가 없습니다." };
+      return { 
+        success: false, 
+        error: `${monthLabel}에 분석할 뉴스가 없습니다.` 
+      };
     }
+
+    console.log(`[MONTHLY] ✅ ${snapshot.size}개 뉴스 발견`);
 
     // 2. Gemini에게 보낼 텍스트 만들기
     const newsData = snapshot.docs.map(doc => {
@@ -37,8 +59,6 @@ export async function generateMonthlySummary(year: number, month: number) {
       model: "gemini-2.0-flash-exp",
       generationConfig: { responseMimeType: "application/json" }
     });
-
-    const monthLabel = `${year}년 ${month}월`;
 
     const prompt = `
       다음은 ${monthLabel}에 수집된 주요 AI 뉴스 목록이야.
@@ -72,7 +92,12 @@ export async function generateMonthlySummary(year: number, month: number) {
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    console.log("🤖 [MONTHLY] Gemini RAW Response:", text);
+    
     const summaryData = JSON.parse(text);
+    
+    console.log("✅ [MONTHLY] Parsed Data Success:", summaryData);
 
     // 4. DB에 저장 (isPublished: false로 생성)
     await addDoc(collection(db, "monthly_summaries"), {
@@ -82,10 +107,12 @@ export async function generateMonthlySummary(year: number, month: number) {
       period_start: Timestamp.fromDate(startDate),
       period_end: Timestamp.fromDate(endDate),
       created_at: serverTimestamp(),
-      isPublished: false  // 🌟 기본값: 비공개
+      isPublished: false
     });
 
-    return { success: true };
+    console.log(`[MONTHLY] ✅ 리포트 저장 성공: ${monthLabel}`);
+
+    return { success: true, message: `${monthLabel} 리포트 생성 완료` };
 
   } catch (error: any) {
     console.error("Monthly Summary Error:", error);

@@ -21,12 +21,14 @@ interface SummaryModalProps {
   onClose: () => void;
   type: "weekly" | "monthly";
   weekLabel?: string;
+  weekStartDate?: string;  // "2024-11-24"
+  weekEndDate?: string;    // "2024-11-30"
   year?: number;
   month?: number;
 }
 
 export default function SummaryModal({ 
-  isOpen, onClose, type, weekLabel, year, month 
+  isOpen, onClose, type, weekLabel, weekStartDate, weekEndDate, year, month 
 }: SummaryModalProps) {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,6 @@ export default function SummaryModal({
       setLoading(true);
       setSummary(null);
       
-      // 관리자는 비공개 포함, 일반 사용자는 공개된 것만
       if (type === "weekly" && weekLabel) {
         const data = await getWeeklySummaryByWeek(weekLabel, isAdmin);
         setSummary(data);
@@ -66,43 +67,43 @@ export default function SummaryModal({
     fetchSummary();
   }, [isOpen, type, weekLabel, year, month, isAdmin]);
 
-  // 요약 생성 (관리자만)
+  // ✅ [핵심 수정] 요약 생성 - weekLabel을 첫 번째 파라미터로 전달
   const handleGenerate = async () => {
     if (!isAdmin) return;
     
-    const confirmMsg = type === "weekly" 
-      ? `${weekLabel} 주간 리포트를 생성하시겠습니까?`
-      : `${year}년 ${month}월 월간 리포트를 생성하시겠습니까?`;
+    let confirmMsg = "";
+    
+    if (type === "weekly" && weekStartDate && weekEndDate) {
+      confirmMsg = `${weekLabel} 주간 리포트를 생성하시겠습니까?\n기간: ${weekStartDate} ~ ${weekEndDate}`;
+    } else {
+      confirmMsg = `${year}년 ${month}월 월간 리포트를 생성하시겠습니까?`;
+    }
     
     if (!confirm(confirmMsg)) return;
 
     setGenerating(true);
     
     let res;
-    if (type === "weekly") {
-      res = await generateWeeklySummary();
+    if (type === "weekly" && weekLabel && weekStartDate && weekEndDate) {
+      // ✅ weekLabel을 첫 번째 인자로 전달
+      res = await generateWeeklySummary(weekLabel, weekStartDate, weekEndDate);
     } else if (year && month) {
-      res = await generateMonthlySummary(year, month);
+      // ✅ monthLabel을 첫 번째 인자로 전달
+      const monthLabel = `${year}년 ${month}월`;
+      res = await generateMonthlySummary(monthLabel, year, month);
     }
 
     setGenerating(false);
 
     if (res?.success) {
-      alert("리포트가 생성되었습니다! 📊\n확인 후 '공개하기' 버튼을 눌러주세요.");
-      // 다시 불러오기
-      if (type === "weekly" && weekLabel) {
-        const data = await getWeeklySummaryByWeek(weekLabel, true);
-        setSummary(data);
-      } else if (year && month) {
-        const data = await getMonthlySummaryByMonth(year, month, true);
-        setSummary(data);
-      }
+      alert("리포트가 생성되었습니다! 📊\n모달을 닫고 다시 열어주세요.");
+      onClose();
     } else {
       alert("실패: " + res?.error);
     }
   };
 
-  // 공개하기 (관리자만)
+  // 공개하기
   const handlePublish = async () => {
     if (!isAdmin || !summary?.id) return;
     
@@ -122,7 +123,7 @@ export default function SummaryModal({
     }
   };
 
-  // 삭제하기 (관리자만)
+  // 삭제하기
   const handleDelete = async () => {
     if (!isAdmin || !summary?.id) return;
     
@@ -184,6 +185,18 @@ export default function SummaryModal({
     setEditData({ ...editData, trends: newTrends });
   };
 
+  // 날짜 포맷 함수
+  const formatDateRange = () => {
+    if (type === "weekly" && weekStartDate && weekEndDate) {
+      const start = new Date(weekStartDate);
+      const end = new Date(weekEndDate);
+      return `${start.getMonth() + 1}월 ${start.getDate()}일 ~ ${end.getMonth() + 1}월 ${end.getDate()}일`;
+    } else if (type === "monthly" && year && month) {
+      return `${year}년 ${month}월 1일 ~ ${month}월 말일`;
+    }
+    return "";
+  };
+
   if (!isOpen) return null;
 
   const title = type === "weekly" ? `📊 ${weekLabel} 주간 리포트` : `📊 ${year}년 ${month}월 월간 리포트`;
@@ -196,7 +209,6 @@ export default function SummaryModal({
         <div className="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-800/50">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
-            {/* 공개/비공개 뱃지 */}
             {summary && isAdmin && (
               <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
                 summary.isPublished 
@@ -219,14 +231,22 @@ export default function SummaryModal({
               <p className="text-gray-500 mb-4">
                 {isAdmin ? "아직 생성된 리포트가 없습니다." : "아직 공개된 리포트가 없습니다."}
               </p>
+              
               {isAdmin && (
-                <button
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50"
-                >
-                  {generating ? "분석 중..." : "✨ 리포트 생성하기"}
-                </button>
+                <div className="space-y-4">
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generating ? "분석 중..." : "✨ 리포트 생성하기"}
+                  </button>
+                  
+                  {/* 날짜 범위 표시 */}
+                  <p className="text-xs text-gray-500">
+                    📅 분석 기간: {formatDateRange()}
+                  </p>
+                </div>
               )}
             </div>
           ) : isEditing ? (
@@ -287,6 +307,10 @@ export default function SummaryModal({
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
                   {summary.summary}
                 </h2>
+                {/* 분석 기간 표시 */}
+                <p className="text-xs text-gray-500 mt-2">
+                  📅 분석 기간: {formatDateRange()}
+                </p>
               </div>
 
               {/* 트렌드 */}
@@ -348,7 +372,6 @@ export default function SummaryModal({
               {/* 관리자 버튼들 */}
               {isAdmin && (
                 <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800">
-                  {/* 공개하기 버튼 (비공개 상태일 때만) */}
                   {!summary.isPublished && (
                     <button
                       onClick={handlePublish}
