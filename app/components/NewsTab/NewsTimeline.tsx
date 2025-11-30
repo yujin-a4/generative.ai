@@ -4,17 +4,11 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRecentNews, NewsArticle } from "@/app/lib/newsService";
 import NewsCard from "./NewsCard";
-import { getExtendedSearchTerms } from "@/app/lib/searchUtils";
+// import { getExtendedSearchTerms } from "@/app/lib/searchUtils"; // 검색 기능 제거됨
 import NewsLoading from "./NewsLoading";
 import SummaryModal from "./SummaryModal";
 
-interface NewsTimelineProps {
-  refreshKey: number;
-  onNewsClick: (news: NewsArticle) => void;
-  onNewsEdit: (news: NewsArticle) => void;
-  onRefresh: () => void;
-  searchKeyword: string;
-}
+// 🌟 [수정] 모든 유틸리티 함수를 모듈 레벨에 정의하여 스코프 오류 해결
 
 // "2025년 11월" 형식
 function getMonthLabel(date: Date): string {
@@ -50,6 +44,13 @@ function getWeekSortKey(date: Date): number {
   return Math.ceil((date.getDate() + firstDayWeekday) / 7);
 }
 
+interface NewsTimelineProps {
+  refreshKey: number;
+  onNewsClick: (news: NewsArticle) => void;
+  onNewsEdit: (news: NewsArticle) => void;
+  onRefresh: () => void;
+}
+
 interface WeekGroup {
   label: string;
   dbLabel: string;
@@ -66,7 +67,7 @@ interface MonthGroup {
 }
 
 export default function NewsTimeline({ 
-  refreshKey, onNewsClick, onNewsEdit, onRefresh, searchKeyword 
+  refreshKey, onNewsClick, onNewsEdit, onRefresh
 }: NewsTimelineProps) {
   
   const { data: allNews = [], isLoading: loading, refetch } = useQuery({
@@ -75,11 +76,9 @@ export default function NewsTimeline({
     staleTime: 1000 * 60 * 3,
   });
 
-  // 월별 접힘 상태 관리
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
 
-  // 요약 모달 상태
   const [summaryModal, setSummaryModal] = useState<{
     isOpen: boolean;
     type: "weekly" | "monthly";
@@ -94,17 +93,7 @@ export default function NewsTimeline({
     }
   }, [refreshKey, refetch]);
 
-  // 검색어 필터링
-  const filteredNews = allNews.filter((news) => {
-    if (!searchKeyword.trim()) return true;
-
-    const searchTerms = getExtendedSearchTerms(searchKeyword);
-    return searchTerms.some(term => 
-      news.title.toLowerCase().includes(term) ||
-      news.shortSummary.toLowerCase().includes(term) ||
-      news.tags?.some(tag => tag.toLowerCase().includes(term))
-    );
-  });
+  const newsForGrouping = allNews; // 검색어 필터링 로직 제거 (allNews를 직접 사용)
 
   // 월별 → 주별 그룹핑
   const groupedByMonth: Record<string, { 
@@ -115,16 +104,16 @@ export default function NewsTimeline({
     weeks: Record<string, WeekGroup> 
   }> = {};
 
-  filteredNews.forEach((news) => {
+  newsForGrouping.forEach((news) => {
     const targetDate = news.publishedAt || news.createdAt;
     if (!targetDate) return;
     
     const date = targetDate.toDate();
-    const monthLabel = getMonthLabel(date);
-    const monthSortKey = getMonthSortKey(date);
-    const weekLabel = getWeekLabel(date);
-    const weekDbLabel = getWeekLabelForDB(date);
-    const weekSortKey = getWeekSortKey(date);
+    const monthLabel = getMonthLabel(date); // 👈 함수 사용
+    const monthSortKey = getMonthSortKey(date); // 👈 함수 사용
+    const weekLabel = getWeekLabel(date); // 👈 함수 사용
+    const weekDbLabel = getWeekLabelForDB(date); // 👈 함수 사용
+    const weekSortKey = getWeekSortKey(date); // 👈 함수 사용
 
     if (!groupedByMonth[monthLabel]) {
       groupedByMonth[monthLabel] = { 
@@ -276,8 +265,8 @@ export default function NewsTimeline({
                         </button>
                       </div>
 
-                      {/* 해당 주 뉴스 카드들 - 한 줄에 3개 */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* 해당 주 뉴스 카드들 - 한 줄에 4개로 수정 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {week.news.map((newsItem) => (
                           <NewsCard 
                             key={newsItem.id} 
@@ -285,6 +274,8 @@ export default function NewsTimeline({
                             onClick={() => onNewsClick(newsItem)}
                             onEdit={onNewsEdit}
                             refreshList={onRefresh}
+                            hideSummary={true}
+                            isTimelineView={true} // 👈 이 줄이 추가되었습니다.
                           />
                         ))}
                       </div>

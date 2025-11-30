@@ -11,9 +11,11 @@ interface NewsCardProps {
   onClick: () => void;
   onEdit: (news: NewsArticle) => void;
   refreshList: () => void;
+  hideSummary?: boolean; 
+  isTimelineView?: boolean; // 👈 [추가] 타임라인 뷰 여부
 }
 
-export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCardProps) {
+export default function NewsCard({ news, onClick, onEdit, refreshList, hideSummary = false, isTimelineView = false }: NewsCardProps) {
   const category = getCategoryInfo(news.category);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -113,6 +115,11 @@ export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCar
   const isMyPost = currentUserId && news.authorId === currentUserId;
   const canDelete = isMyPost || isAdmin;
   const canEdit = isMyPost;
+  
+  // 🌟 [추가] 폰트 크기 및 줄 수 클래스 선택
+  const titleSizeClass = isTimelineView
+    ? "text-base line-clamp-3" // 타임라인: 작게, 3줄까지 허용
+    : "text-lg line-clamp-2"; // 기본: 크게, 2줄까지 허용
 
   return (
     <div 
@@ -125,7 +132,6 @@ export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCar
           {category.icon} {category.name}
         </span>
         
-        {/* 🌟 날짜를 여기(오른쪽 위)로 이동 */}
         <span className="text-xs text-gray-400 font-medium">
           {dateStr}
         </span>
@@ -142,7 +148,7 @@ export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCar
       </div>
 
       {/* 2. 제목 */}
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+      <h3 className={`font-bold text-gray-900 dark:text-white mb-1 transition-colors group-hover:text-indigo-600 ${titleSizeClass}`}>
         {news.title}
       </h3>
 
@@ -152,9 +158,11 @@ export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCar
       </div>
 
       {/* 4. 요약 내용 */}
-      <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-4 bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg flex-1">
-        {news.shortSummary}
-      </p>
+      {!hideSummary && (
+        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-4 bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg flex-1">
+          {news.shortSummary}
+        </p>
+      )}
 
       {/* 5. 하단 라인: 태그(왼쪽) ... 아이콘(오른쪽) */}
       <div className="flex items-end justify-between mt-auto">
@@ -167,7 +175,7 @@ export default function NewsCard({ news, onClick, onEdit, refreshList }: NewsCar
           ))}
         </div>
 
-        {/* 인터랙션 버튼들 (하트 | 별) - 조회수 삭제됨 */}
+        {/* 인터랙션 버튼들 (하트 | 별) */}
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {/* ❤️ 좋아요 */}
           <button 

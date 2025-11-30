@@ -7,13 +7,17 @@ import { useSearchParams } from "next/navigation";
 import { auth } from "@/lib/firebase"; // Auth 추가
 import { onAuthStateChanged } from "firebase/auth";
 
-// 카테고리 정의
+// 🌟 [수정] REPORT_CATEGORIES 목록 업데이트: 코딩/에이전트 삭제, TTS/STT 추가
 const REPORT_CATEGORIES = [
   { id: "llm", label: "LLM 순위", icon: "🤖", searchKey: "LLM", keywords: ["LLM", "종합"] },
   { id: "image", label: "이미지 AI", icon: "🎨", searchKey: "Image", keywords: ["Image", "이미지"] },
   { id: "video", label: "영상 AI", icon: "🎬", searchKey: "Video", keywords: ["Video", "영상"] },
-  { id: "coding", label: "코딩/개발", icon: "💻", searchKey: "Coding", keywords: ["Coding", "코딩", "Dev"] },
-  { id: "agent", label: "에이전트", icon: "⚡", searchKey: "Agent", keywords: ["Agent", "에이전트", "비서"] },
+  
+  // 🌟 코딩/개발 및 에이전트 탭 제거됨
+  
+  { id: "tts", label: "TTS (음성 합성)", icon: "🎶", searchKey: "TTS", keywords: ["TTS", "음성합성", "Voice"] }, // 👈 TTS 추가
+  { id: "stt", label: "STT (음성 인식)", icon: "🎙️", searchKey: "STT", keywords: ["STT", "음성인식", "Speech"] }, // 👈 STT 추가
+  
   { id: "service", label: "서비스 랭킹", icon: "🏆", searchKey: "Service", keywords: ["Service", "서비스"] },
 ];
 

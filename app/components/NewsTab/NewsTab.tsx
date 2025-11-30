@@ -9,7 +9,7 @@ import NewsDetailModal from "./NewsDetailModal";
 import { NewsArticle } from "@/app/lib/newsService";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import SearchBar from "./SearchBar";
+import SearchBar from "./SearchBar"; // (SearchBar import는 유지)
 
 export default function NewsTab() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
@@ -17,11 +17,11 @@ export default function NewsTab() {
   const [editTarget, setEditTarget] = useState<NewsArticle | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // 뷰 모드 (타임라인이 메인)
+  // 뷰 모드
   const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">("timeline");
   
-  // 타임라인용 검색어
-  const [searchKeyword, setSearchKeyword] = useState("");
+  // 타임라인용 검색어 (사용하지 않지만 상태는 유지)
+  const [searchKeyword, setSearchKeyword] = useState(""); 
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
@@ -53,11 +53,9 @@ export default function NewsTab() {
         {/* 타이틀 & 뷰모드 & 뉴스추가 버튼 */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
-            {/* 🌟 [수정] 타이틀 변경 */}
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               📰 AI 뉴스 모아보기
             </h2>
-            {/* 🌟 [수정] 부제 변경 및 안내 문구 적용 */}
             <p className="text-sm text-gray-500 mt-1 leading-relaxed">
               최신 AI 및 에듀테크 동향을 한눈에 파악할 수 있습니다.
               <br/>
@@ -97,14 +95,8 @@ export default function NewsTab() {
           </div>
         </div>
 
-        {/* 타임라인 검색창 (타임라인 뷰에서만, 오른쪽 정렬) */}
-        {viewMode === 'timeline' && (
-          <div className="flex justify-end">
-            <div className="w-full sm:w-[400px]">
-              <SearchBar value={searchKeyword} onChange={setSearchKeyword} />
-            </div>
-          </div>
-        )}
+        {/* 🌟 [제거] 타임라인 검색창 렌더링 블록을 완전히 삭제했습니다. */}
+        {/* {viewMode === 'timeline' && ( ... )} */}
       </div>
 
       {/* 뷰 모드 스위칭 */}
@@ -114,7 +106,7 @@ export default function NewsTab() {
           onNewsClick={(news) => setSelectedNews(news)}
           onNewsEdit={handleEdit}
           onRefresh={handleRefresh}
-          searchKeyword={searchKeyword}
+          // 🌟 [제거] searchKeyword prop 전달 제거
         />
       )}
       
