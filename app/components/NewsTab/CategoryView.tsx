@@ -11,16 +11,17 @@ import NewsLoading from "./NewsLoading";
 import SearchBar from "./SearchBar";
 import { DateDropdown, SortDropdown } from "./FilterDropdowns";
 
+// 🌟 [수정됨] DB에 저장되는 영문 ID로 id 값을 변경했습니다.
 const CATEGORIES = [
   { id: "ALL", label: "전체", icon: "📋" },
-  { id: "에듀테크 x AI", label: "에듀테크 x AI", icon: "🎓" },
-  { id: "AI 기술", label: "AI 기술", icon: "🤖" },
-  { id: "AI 툴/플랫폼", label: "AI 툴/플랫폼", icon: "🛠️" },
-  { id: "업계 동향", label: "업계 동향", icon: "📊" },
-  { id: "기업/투자", label: "기업/투자", icon: "💼" },
-  { id: "정책/규제", label: "정책/규제", icon: "📜" },
-  { id: "연구/논문", label: "연구/논문", icon: "📚" },
-  { id: "신제품 출시", label: "신제품 출시", icon: "🚀" },
+  { id: "EDUTECH_AI", label: "에듀테크 x AI", icon: "🎓" },
+  { id: "AI_TECH", label: "AI 기술", icon: "🤖" },
+  { id: "AI_TOOLS", label: "AI 툴/플랫폼", icon: "🛠️" },
+  { id: "INDUSTRY_TREND", label: "업계 동향", icon: "📊" },
+  { id: "COMPANY_NEWS", label: "기업/투자", icon: "💼" },
+  { id: "POLICY_ETHICS", label: "정책/규제", icon: "📜" },
+  { id: "RESEARCH", label: "연구/논문", icon: "📚" },
+  { id: "PRODUCT_RELEASE", label: "신제품 출시", icon: "🚀" },
 ];
 
 interface CategoryViewProps {
@@ -64,7 +65,7 @@ export default function CategoryView({
 
   // 필터링
   const filteredList = newsList.filter((news) => {
-    // 카테고리 필터
+    // 카테고리 필터 (이제 영문 ID끼리 비교하므로 정상 작동합니다)
     const categoryMatch = filterCategory === "ALL" || news.category === filterCategory;
     
     // 검색어 필터

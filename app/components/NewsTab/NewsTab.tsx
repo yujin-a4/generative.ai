@@ -9,7 +9,7 @@ import NewsDetailModal from "./NewsDetailModal";
 import { NewsArticle } from "@/app/lib/newsService";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import SearchBar from "./SearchBar"; // (SearchBar import는 유지)
+import SearchBar from "./SearchBar"; 
 
 export default function NewsTab() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
@@ -17,8 +17,8 @@ export default function NewsTab() {
   const [editTarget, setEditTarget] = useState<NewsArticle | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // 뷰 모드
-  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">("timeline");
+  // 기본 뷰 모드: category
+  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">("category");
   
   // 타임라인용 검색어 (사용하지 않지만 상태는 유지)
   const [searchKeyword, setSearchKeyword] = useState(""); 
@@ -64,20 +64,26 @@ export default function NewsTab() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* 뷰 모드 토글 */}
+            {/* 뷰 모드 토글 버튼 그룹 */}
             <div className="bg-gray-100 dark:bg-zinc-800 p-1 rounded-lg flex text-sm font-medium">
-              <button 
-                onClick={() => setViewMode("timeline")} 
-                className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "timeline" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
-              >
-                📅 타임라인
-              </button>
+              
+              {/* 1. 카테고리별 (순서 변경됨) */}
               <button 
                 onClick={() => setViewMode("category")} 
                 className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "category" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
               >
                 📂 카테고리별
               </button>
+
+              {/* 2. 타임라인 (순서 변경됨) */}
+              <button 
+                onClick={() => setViewMode("timeline")} 
+                className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "timeline" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
+              >
+                📅 타임라인
+              </button>
+
+              {/* 3. 즐겨찾기 */}
               <button 
                 onClick={() => setViewMode("bookmarks")} 
                 className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "bookmarks" ? "bg-white dark:bg-zinc-600 text-yellow-500 font-bold shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
@@ -94,22 +100,11 @@ export default function NewsTab() {
             </button>
           </div>
         </div>
-
-        {/* 🌟 [제거] 타임라인 검색창 렌더링 블록을 완전히 삭제했습니다. */}
-        {/* {viewMode === 'timeline' && ( ... )} */}
       </div>
 
-      {/* 뷰 모드 스위칭 */}
-      {viewMode === "timeline" && (
-        <NewsTimeline 
-          refreshKey={refreshKey} 
-          onNewsClick={(news) => setSelectedNews(news)}
-          onNewsEdit={handleEdit}
-          onRefresh={handleRefresh}
-          // 🌟 [제거] searchKeyword prop 전달 제거
-        />
-      )}
+      {/* 뷰 모드 렌더링 영역 */}
       
+      {/* 1. 카테고리 뷰 */}
       {viewMode === "category" && (
         <CategoryView 
           refreshKey={refreshKey} 
@@ -118,7 +113,18 @@ export default function NewsTab() {
           onRefresh={handleRefresh}
         />
       )}
+
+      {/* 2. 타임라인 뷰 */}
+      {viewMode === "timeline" && (
+        <NewsTimeline 
+          refreshKey={refreshKey} 
+          onNewsClick={(news) => setSelectedNews(news)}
+          onNewsEdit={handleEdit}
+          onRefresh={handleRefresh}
+        />
+      )}
       
+      {/* 3. 즐겨찾기 뷰 */}
       {viewMode === "bookmarks" && (
         <BookmarkView 
           refreshKey={refreshKey} 
