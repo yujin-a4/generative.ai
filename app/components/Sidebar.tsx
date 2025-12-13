@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
 export type MenuType = 'dashboard' | 'news' | 'reports' | 'services';
 
 interface SidebarProps {
@@ -27,6 +30,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
         fixed left-0 top-0 h-full bg-white dark:bg-zinc-900 border-r border-gray-200 dark:border-zinc-800
         transition-all duration-300 ease-in-out z-30
         ${isCollapsed ? 'w-20' : 'w-64'}
+        flex flex-col
       `}
     >
       {/* 사이드바 헤더 */}
@@ -60,7 +64,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
       </div>
 
       {/* 메뉴 목록 */}
-      <nav className="mt-6 px-3">
+      <nav className="mt-6 px-3 flex-1">
         {menuItems.map((item) => {
           const isActive = activeMenu === item.id;
           return (
@@ -84,7 +88,20 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
           );
         })}
       </nav>
+
+      {/* 🌟 하단 푸터 수정됨 */}
+      {!isCollapsed && (
+        <div className="p-6 mb-2">
+          {/* 크기 up (text-xs -> text-sm) */}
+          <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
+            YBM AI Lab
+          </p>
+          {/* 크기 up (text-[10px] -> text-xs) & 색상 진하게 (gray-300 -> gray-400) */}
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            Yujin Kang
+          </p>
+        </div>
+      )}
     </div>
   );
 }
-
