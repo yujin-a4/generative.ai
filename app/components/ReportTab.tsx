@@ -104,7 +104,7 @@ export default function ReportTab() {
   return (
     <div className="w-full">
       {/* 2차 탭 네비게이션 */}
-      <div className="sticky top-[73px] z-10 bg-gray-50/95 dark:bg-black/95 backdrop-blur-md border-b border-gray-200 dark:border-zinc-800 px-4 mb-8">
+      <div className="bg-gray-50 dark:bg-black border-b border-gray-200 dark:border-zinc-800 px-4 mb-8">
         <div className="max-w-5xl mx-auto flex overflow-x-auto no-scrollbar space-x-4 md:space-x-8">
           {REPORT_CATEGORIES.map((cat) => (
             <button

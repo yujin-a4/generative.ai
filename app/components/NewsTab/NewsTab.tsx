@@ -67,7 +67,7 @@ export default function NewsTab() {
             {/* 뷰 모드 토글 버튼 그룹 */}
             <div className="bg-gray-100 dark:bg-zinc-800 p-1 rounded-lg flex text-sm font-medium">
               
-              {/* 1. 카테고리별 (순서 변경됨) */}
+              {/* 1. 카테고리별 */}
               <button 
                 onClick={() => setViewMode("category")} 
                 className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "category" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
@@ -75,7 +75,7 @@ export default function NewsTab() {
                 📂 카테고리별
               </button>
 
-              {/* 2. 타임라인 (순서 변경됨) */}
+              {/* 2. 타임라인 */}
               <button 
                 onClick={() => setViewMode("timeline")} 
                 className={`px-3 py-1.5 rounded-md transition-all ${viewMode === "timeline" ? "bg-white dark:bg-zinc-600 text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-900 dark:hover:text-gray-300"}`}
@@ -140,7 +140,9 @@ export default function NewsTab() {
         initialData={editTarget}
       />
 
+      {/* 🛠️ [수정 완료] isOpen 속성 추가 (뉴스가 선택되면 true) */}
       <NewsDetailModal 
+        isOpen={!!selectedNews} 
         news={selectedNews} 
         onClose={() => setSelectedNews(null)} 
       />

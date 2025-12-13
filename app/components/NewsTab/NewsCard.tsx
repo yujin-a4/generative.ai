@@ -5,6 +5,8 @@ import { NewsArticle, deleteNews, toggleLikeNews, toggleBookmarkNews } from "@/a
 import { getCategoryInfo } from "@/app/lib/newsCategories";
 import { auth } from "@/lib/firebase"; 
 import { onAuthStateChanged } from "firebase/auth";
+// 🛠️ [수정 1] 데이터 갱신을 위해 useQueryClient 추가
+import { useQueryClient } from "@tanstack/react-query";
 
 interface NewsCardProps {
   news: NewsArticle;
@@ -12,13 +14,16 @@ interface NewsCardProps {
   onEdit: (news: NewsArticle) => void;
   refreshList: () => void;
   hideSummary?: boolean; 
-  isTimelineView?: boolean; // 👈 [추가] 타임라인 뷰 여부
+  isTimelineView?: boolean;
 }
 
 export default function NewsCard({ news, onClick, onEdit, refreshList, hideSummary = false, isTimelineView = false }: NewsCardProps) {
   const category = getCategoryInfo(news.category);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // 🛠️ [수정 2] 쿼리 클라이언트 초기화
+  const queryClient = useQueryClient();
 
   const [likedBy, setLikedBy] = useState<string[]>(news.likedBy || []);
   const [isLiked, setIsLiked] = useState(false);
@@ -49,6 +54,7 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
     const prevLikedBy = [...likedBy];
     const prevIsLiked = isLiked;
 
+    // UI 낙관적 업데이트 (즉시 반응)
     if (isLiked) {
       setLikedBy(prev => prev.filter(id => id !== currentUserId));
       setIsLiked(false);
@@ -58,10 +64,18 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
     }
 
     try {
-      if (news.id) await toggleLikeNews(news.id, currentUserId, prevLikedBy);
+      if (news.id) {
+        await toggleLikeNews(news.id, currentUserId, prevLikedBy);
+        // 🛠️ [수정 3] 서버 저장 성공 시, 관련 쿼리 무효화 (데이터 최신화)
+        // 'recentNews', 'news' 등 관련된 모든 키를 갱신해야 다른 탭에서도 반영됩니다.
+        await queryClient.invalidateQueries({ queryKey: ["recentNews"] });
+        await queryClient.invalidateQueries({ queryKey: ["news"] }); // 필요 시 추가 키
+      }
     } catch (error) {
+      // 실패 시 롤백
       setLikedBy(prevLikedBy);
       setIsLiked(prevIsLiked);
+      alert("좋아요 처리에 실패했습니다.");
     }
   };
 
@@ -72,6 +86,7 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
     const prevBookmarkedBy = [...bookmarkedBy];
     const prevIsBookmarked = isBookmarked;
 
+    // UI 낙관적 업데이트
     if (isBookmarked) {
         setBookmarkedBy(prev => prev.filter(id => id !== currentUserId));
         setIsBookmarked(false);
@@ -81,10 +96,17 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
     }
 
     try {
-        if (news.id) await toggleBookmarkNews(news.id, currentUserId, prevBookmarkedBy);
+        if (news.id) {
+          await toggleBookmarkNews(news.id, currentUserId, prevBookmarkedBy);
+          // 🛠️ [수정 4] 북마크 저장 성공 시 데이터 최신화
+          await queryClient.invalidateQueries({ queryKey: ["recentNews"] });
+          await queryClient.invalidateQueries({ queryKey: ["bookmarkedNews"] }); // 즐겨찾기 목록 갱신
+          await queryClient.invalidateQueries({ queryKey: ["news"] });
+        }
     } catch (error) {
         setBookmarkedBy(prevBookmarkedBy);
         setIsBookmarked(prevIsBookmarked);
+        alert("즐겨찾기 처리에 실패했습니다.");
     }
   };
 
@@ -95,7 +117,9 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
       if (news.id) {
         await deleteNews(news.id);
         alert("삭제되었습니다.");
-        refreshList();
+        refreshList(); // 기존 로직 유지 (부모에서 갱신)
+        // 추가로 안전하게 쿼리 갱신
+        queryClient.invalidateQueries({ queryKey: ["recentNews"] });
       }
     } catch (error) {
       alert("삭제 실패");
@@ -116,17 +140,15 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
   const canDelete = isMyPost || isAdmin;
   const canEdit = isMyPost;
   
-  // 🌟 [추가] 폰트 크기 및 줄 수 클래스 선택
   const titleSizeClass = isTimelineView
-    ? "text-base line-clamp-3" // 타임라인: 작게, 3줄까지 허용
-    : "text-lg line-clamp-2"; // 기본: 크게, 2줄까지 허용
+    ? "text-base line-clamp-3" 
+    : "text-lg line-clamp-2"; 
 
   return (
     <div 
       onClick={onClick} 
       className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col relative"
     >
-      {/* 1. 상단 라인: 카테고리 (왼쪽) ... 날짜 (오른쪽) */}
       <div className="flex justify-between items-start mb-3">
         <span className={`px-2 py-1 rounded text-[10px] font-bold ${category.color} bg-opacity-50 border`}>
           {category.icon} {category.name}
@@ -137,7 +159,6 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
         </span>
       </div>
 
-      {/* 수정/삭제 버튼 (우측 상단, 날짜 위에 뜸 - 호버 시) */}
       <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 pl-2 z-10">
         {canEdit && (
           <button onClick={handleEditClick} className="p-1 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600 rounded text-xs font-bold">수정</button>
@@ -147,26 +168,21 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
         )}
       </div>
 
-      {/* 2. 제목 */}
       <h3 className={`font-bold text-gray-900 dark:text-white mb-1 transition-colors group-hover:text-indigo-600 ${titleSizeClass}`}>
         {news.title}
       </h3>
 
-      {/* 3. 발행사 (제목 아래) */}
       <div className="text-xs font-semibold text-gray-500 mb-3">
         {news.source}
       </div>
 
-      {/* 4. 요약 내용 */}
       {!hideSummary && (
         <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-4 bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg flex-1">
           {news.shortSummary}
         </p>
       )}
 
-      {/* 5. 하단 라인: 태그(왼쪽) ... 아이콘(오른쪽) */}
       <div className="flex items-end justify-between mt-auto">
-        {/* 태그들 */}
         <div className="flex flex-wrap gap-1.5">
           {news.tags?.slice(0, 2).map((tag, i) => (
             <span key={i} className="text-[10px] text-gray-500 bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
@@ -175,9 +191,7 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
           ))}
         </div>
 
-        {/* 인터랙션 버튼들 (하트 | 별) */}
         <div className="flex items-center gap-3 text-xs text-gray-500">
-          {/* ❤️ 좋아요 */}
           <button 
             onClick={handleLike}
             className="flex items-center gap-1 hover:text-pink-500 transition-colors"
@@ -194,7 +208,6 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
             <span className={`text-sm ${isLiked ? "text-pink-500 font-bold" : ""}`}>{likedBy.length}</span>
           </button>
 
-          {/* ⭐ 즐겨찾기 */}
           <button 
             onClick={handleBookmark}
             className="hover:text-yellow-400 transition-colors"

@@ -2,28 +2,43 @@
 
 import { NewsArticle } from "@/app/lib/newsService";
 import { getCategoryInfo } from "@/app/lib/newsCategories";
+import { useEffect, useState } from "react";
 
+// 🛠️ isOpen 속성 추가 (필수)
 interface NewsDetailModalProps {
+  isOpen: boolean;
   news: NewsArticle | null;
   onClose: () => void;
 }
 
-export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps) {
+export default function NewsDetailModal({ isOpen, news, onClose }: NewsDetailModalProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsVisible(true);
+      document.body.style.overflow = "hidden";
+    } else {
+      const timer = setTimeout(() => setIsVisible(false), 300);
+      document.body.style.overflow = "unset";
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isVisible && !isOpen) return null;
   if (!news) return null;
 
   const category = getCategoryInfo(news.category);
-  // 🌟 [수정] createdAt 대신 publishedAt을 사용하여 날짜 표시
   const dateStr = news.publishedAt?.toDate 
     ? news.publishedAt.toDate().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) 
     : "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0"}`} onClick={onClose}>
       <div 
-        className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative"
-        onClick={(e) => e.stopPropagation()} // 내부 클릭 시 닫힘 방지
+        className={`bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative transform transition-all duration-300 ${isOpen ? "scale-100 translate-y-0" : "scale-95 translate-y-4"}`}
+        onClick={(e) => e.stopPropagation()} 
       >
-        {/* 닫기 버튼 */}
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 p-2 bg-gray-100 dark:bg-zinc-800 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors z-10"
@@ -31,13 +46,11 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
           ✕
         </button>
 
-        {/* 헤더 이미지/카테고리 영역 */}
         <div className={`p-8 pb-6 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-br ${category.color.replace('bg-', 'from-').replace('text-', '').split(' ')[0]}/10 to-transparent`}>
           <div className="flex items-center gap-2 mb-4">
             <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${category.color} bg-white/80 dark:bg-zinc-900/80 shadow-sm border`}>
               {category.icon} {category.name}
             </span>
-            {/* dateStr은 이제 기사 발행일입니다. */}
             <span className="text-sm text-gray-500">{dateStr}</span>
           </div>
           
@@ -49,10 +62,7 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
           </div>
         </div>
 
-        {/* 스크롤 가능한 컨텐츠 영역 */}
         <div className="p-8 overflow-y-auto custom-scrollbar space-y-8">
-          
-          {/* 1. 핵심 요약 (리스트) */}
           <div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
               📝 핵심 요약
@@ -67,7 +77,6 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
             </ul>
           </div>
 
-          {/* 2. 에듀테크 인사이트 (강조 박스) */}
           <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
             <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-300 uppercase mb-2 flex items-center gap-1">
               💡 에듀테크 Insight
@@ -77,7 +86,6 @@ export default function NewsDetailModal({ news, onClose }: NewsDetailModalProps)
             </p>
           </div>
 
-          {/* 3. 태그 및 링크 */}
           <div className="pt-4 border-t border-gray-100 dark:border-zinc-800">
             <div className="flex flex-wrap gap-2 mb-6">
               {news.tags?.map((tag, i) => (

@@ -5,7 +5,8 @@ import { analyzeNewsArticle } from "@/app/actions/analyzeNews";
 import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
 import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService";
 
-// 🌟 [추천 사이트 데이터 정의는 그대로 유지]
+// 🌟 [수정] 사이트 그룹 통합 및 개별 색상 적용
+// (타입 정의: sites 내부에 선택적 color 속성 추가)
 const SITE_GROUPS = [
   {
     title: "🇰🇷 국내 AI/IT 핵심",
@@ -23,6 +24,31 @@ const SITE_GROUPS = [
       { name: "TechCrunch", url: "https://techcrunch.com/category/artificial-intelligence/", desc: "AI 속보" },
       { name: "MIT Tech", url: "https://www.technologyreview.com/topic/artificial-intelligence/", desc: "심층 분석" },
       { name: "The Verge", url: "https://www.theverge.com/ai-artificial-intelligence", desc: "테크 트렌드" },
+    ]
+  },
+  {
+    // 🛠️ [통합] 에듀테크(2개) + 정책(1개) = 한 줄(3개)로 병합
+    title: "🎓 에듀테크 & 🏛️ 정책",
+    color: "text-gray-600 bg-gray-50", // 기본값 (사용 안됨)
+    sites: [
+      { 
+        name: "AskEdTech", 
+        url: "https://www.askedtech.com/knowledge-archive", 
+        desc: "지식 아카이브",
+        color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300" // 개별 색상
+      },
+      { 
+        name: "에듀모닝", 
+        url: "https://edumorning.com", 
+        desc: "교육 뉴스",
+        color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300"
+      },
+      { 
+        name: "정책브리핑", 
+        url: "https://www.korea.kr/", 
+        desc: "대한민국 정책",
+        color: "text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-300"
+      },
     ]
   },
   {
@@ -49,8 +75,6 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 🌟 [삭제] isGuideOpen 상태 제거
-
   useEffect(() => {
     if (isOpen && initialData) {
       setStep("REVIEW");
@@ -69,7 +93,6 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
       setStep("INPUT");
       setUrl("");
       setAnalysisData(null);
-      // setIsGuideOpen(true); // 👈 삭제
     }
   }, [isOpen, initialData]);
 
@@ -144,25 +167,24 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                   onChange={(e) => setUrl(e.target.value)}
                 />
                 
-                {/* 🌟 [수정] 정적 제목으로 변경 및 내용 항상 표시 */}
                 <div className="mt-4">
                   <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
                     💡 어디에서 뉴스를 찾나요? 추천 사이트를 확인해 보세요.
                   </h4>
 
-                  {/* 아코디언 내용 (항상 표시) */}
                   <div className="space-y-3 p-1">
                     {SITE_GROUPS.map((group) => (
                       <div key={group.title}>
                         <h5 className="text-[10px] font-bold text-gray-400 mb-1.5 ml-1">{group.title}</h5>
                         <div className="grid grid-cols-3 gap-2">
-                          {group.sites.map((site) => (
+                          {group.sites.map((site: any) => (
                             <a 
                               key={site.name}
                               href={site.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`flex flex-col px-2 py-2 rounded-lg border border-transparent hover:border-black/5 hover:shadow-sm transition-all text-center ${group.color}`}
+                              // 🛠️ [수정] site.color가 있으면 우선 적용, 없으면 group.color 적용
+                              className={`flex flex-col px-2 py-2 rounded-lg border border-transparent hover:border-black/5 hover:shadow-sm transition-all text-center ${site.color || group.color}`}
                             >
                               <span className="text-xs font-bold block mb-0.5 truncate">
                                  {site.name}
