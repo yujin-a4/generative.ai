@@ -20,7 +20,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
   const menuItems = [
     { id: 'dashboard' as MenuType, label: '대시보드', icon: '📊' },
     { id: 'news' as MenuType, label: 'AI 뉴스', icon: '📰' },
-    { id: 'services' as MenuType, label: 'AI 툴', icon: '🛠️' },
+    { id: 'services' as MenuType, label: 'AI 툴', icon: '💻' },
     { id: 'reports' as MenuType, label: 'AI 순위', icon: '🏆' },
   ];
 
@@ -47,7 +47,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
               
               {/* 부제 */}
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                함께 만들어 나가는 AI 트렌드 지도
+                함께 만들어 나가는 AI 트렌드 아카이브
               </p>
             </div>
           )}

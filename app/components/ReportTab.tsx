@@ -1,23 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllReports, deleteReport } from "@/app/actions/analyze"; // deleteReport 추가
+import { getAllReports, deleteReport } from "@/app/actions/analyze";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { auth } from "@/lib/firebase"; // Auth 추가
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
-// 🌟 [수정] REPORT_CATEGORIES 목록 업데이트: 코딩/에이전트 삭제, TTS/STT 추가
 const REPORT_CATEGORIES = [
   { id: "llm", label: "LLM 순위", icon: "🤖", searchKey: "LLM", keywords: ["LLM", "종합"] },
   { id: "image", label: "이미지 AI", icon: "🎨", searchKey: "Image", keywords: ["Image", "이미지"] },
   { id: "video", label: "영상 AI", icon: "🎬", searchKey: "Video", keywords: ["Video", "영상"] },
-  
-  // 🌟 코딩/개발 및 에이전트 탭 제거됨
-  
-  { id: "tts", label: "TTS (음성 합성)", icon: "🎶", searchKey: "TTS", keywords: ["TTS", "음성합성", "Voice"] }, // 👈 TTS 추가
-  { id: "stt", label: "STT (음성 인식)", icon: "🎙️", searchKey: "STT", keywords: ["STT", "음성인식", "Speech"] }, // 👈 STT 추가
-  
+  { id: "tts", label: "TTS (음성 합성)", icon: "🎶", searchKey: "TTS", keywords: ["TTS", "음성합성", "Voice"] },
+  { id: "stt", label: "STT (음성 인식)", icon: "🎙️", searchKey: "STT", keywords: ["STT", "음성인식", "Speech"] },
   { id: "service", label: "서비스 랭킹", icon: "🏆", searchKey: "Service", keywords: ["Service", "서비스"] },
 ];
 
@@ -27,16 +22,13 @@ export default function ReportTab() {
   const [allReports, setAllReports] = useState<any[]>([]);
   const [filteredReports, setFilteredReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false); // 🌟 관리자 여부 상태
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // URL에서 서브 탭 정보 가져오기
   const searchParams = useSearchParams();
   const initialSub = searchParams.get('sub');
   
-  // 초기값을 URL 파라미터로 설정 (없으면 'llm')
   const [activeCategory, setActiveCategory] = useState(initialSub || "llm");
 
-  // 데이터 불러오기 함수
   const fetchData = async () => {
     setLoading(true);
     const data = await getAllReports();
@@ -47,7 +39,6 @@ export default function ReportTab() {
   useEffect(() => {
     fetchData();
 
-    // 🌟 관리자 인증 상태 체크
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.email === "yujinkang1008@gmail.com") {
         setIsAdmin(true);
@@ -72,17 +63,16 @@ export default function ReportTab() {
     setFilteredReports(filtered);
   }, [activeCategory, allReports]);
 
-  // 🌟 리포트 삭제 핸들러
   const handleDeleteReport = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault(); // Link 이동 방지
-    e.stopPropagation(); // 이벤트 전파 방지
+    e.preventDefault();
+    e.stopPropagation();
     
     if (!confirm("정말로 이 리포트를 삭제하시겠습니까? (복구 불가)")) return;
 
     const res = await deleteReport(id);
     if (res.success) {
       alert("리포트가 삭제되었습니다.");
-      fetchData(); // 목록 새로고침
+      fetchData();
     } else {
       alert("삭제 실패");
     }
@@ -156,7 +146,6 @@ export default function ReportTab() {
               <Link href={`/report/${report.id}`} key={report.id} className="group block relative">
                  <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-200 dark:border-zinc-800 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col relative">
                   
-                  {/* 🌟 관리자 전용 삭제 버튼 */}
                   {isAdmin && (
                     <button
                       onClick={(e) => handleDeleteReport(e, report.id)}
@@ -182,25 +171,16 @@ export default function ReportTab() {
                       <span>📅 {formatDate(report.created_at)}</span>
                     </div>
                     
+                    {/* 🌟 수정된 부분: 모든 리포트 타입에 대해 공통 요약 UI 적용 */}
                     <div className="space-y-2 mb-6 flex-1">
-                      {report.analysis_result?.report_type === "LLM" ? (
-                        <>
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 line-clamp-1 flex items-center gap-2">
-                            <span className="text-lg">{SUMMARY_ICONS[0]}</span>
-                            {report.analysis_result?.summary_insights?.[0] || "총평 인사이트 준비 중..."}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-2">
-                            <span className="text-lg">{SUMMARY_ICONS[1]}</span>
-                            {report.analysis_result?.summary_insights?.[1] || "두 번째 핵심 내용 없음"}
-                          </p>
-                        </>
-                      ) : (
-                        report.analysis_result?.overview_summary?.slice(0, 2).map((s: string, i: number) => (
-                          <p key={i} className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                            {s.replace(/["']/g, "")}
-                          </p>
-                        ))
-                      )}
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 line-clamp-1 flex items-center gap-2">
+                        <span className="text-lg">{SUMMARY_ICONS[0]}</span>
+                        {report.analysis_result?.summary_insights?.[0] || "총평 요약 생성 중..."}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-2">
+                        <span className="text-lg">{SUMMARY_ICONS[1]}</span>
+                        {report.analysis_result?.summary_insights?.[1] || "추가 분석 내용 없음"}
+                      </p>
                     </div>
                     
                     <div className="flex items-center text-indigo-600 font-semibold text-sm group-hover:underline">

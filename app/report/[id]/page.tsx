@@ -9,24 +9,28 @@ export default async function ReportDetailPage({ params }: { params: { id: strin
     return <div className="p-10 text-center">리포트를 찾을 수 없습니다.</div>;
   }
 
+  // 🌟 리포트 타입에 따른 제목 설정 (기본값: AI Insight)
+  const reportType = report.analysis_result?.report_type || "AI";
+  const headerTitle = `${reportType.toUpperCase()} Insight 🧠`;
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       {/* 네비게이션 */}
       <nav className="border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex justify-between items-center">
-          {/* 🌟 핵심 수정: href="/" -> "/?tab=reports" */}
           <Link 
             href="/?tab=reports" 
             className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-2"
           >
             ← 목록으로 돌아가기
           </Link>
-          <div className="font-bold text-xl text-indigo-600 dark:text-indigo-400">LLM Insight 🧠</div>
+          {/* 🌟 동적 타이틀 적용 */}
+          <div className="font-bold text-xl text-indigo-600 dark:text-indigo-400">{headerTitle}</div>
         </div>
       </nav>
 
       <main className="p-4 md:p-8 animate-fade-in-up">
-        {/* isEditable 미전달 (기본값 false) → 일반 사용자는 편집 불가 */}
+        {/* ReportView는 수정 없이 데이터 구조가 통일되었으므로 그대로 작동함 */}
         <ReportView data={report} />
       </main>
     </div>

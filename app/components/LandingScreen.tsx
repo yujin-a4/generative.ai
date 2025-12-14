@@ -66,7 +66,7 @@ export default function LandingScreen({ onEnter }: LandingScreenProps) {
 
         {/* 부제 */}
         <p className="text-xl md:text-2xl text-gray-700 dark:text-gray-300 mb-12 animate-fade-in-up-delay font-medium">
-          함께 만들어 나가는 AI 트렌드 지도
+          함께 만들어 나가는 AI 트렌드 아카이브
         </p>
 
         {/* 시작하기 버튼 */}
