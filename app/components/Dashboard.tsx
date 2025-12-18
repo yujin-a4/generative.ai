@@ -11,11 +11,13 @@ import { getAiServices, upsertServiceUrl } from "@/app/actions/serviceActions";
 import { MenuType } from "./Sidebar";
 import type { AIService } from "@/types/service";
 import NewsDetailModal from "./NewsTab/NewsDetailModal";
+import SummaryModal from "./NewsTab/SummaryModal"; // 🌟 [추가] 리포트 모달 임포트
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 interface DashboardProps {
-  onMenuChange?: (menu: MenuType) => void;
+  // 🌟 [수정] 타임라인 뷰 이동 신호를 위해 subView 인자 추가
+  onMenuChange?: (menu: MenuType, subView?: string) => void;
 }
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: string; reportKeywords: string[] }> = {
@@ -34,6 +36,10 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
   const [selectedNews, setSelectedNews] = useState<any | null>(null);
   const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // 🌟 [추가] 리포트 상세 모달 상태
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
   // 🌟 [통합] 리포트 매핑(이름+링크) 수정 모달
   const [isEditMappingModalOpen, setIsEditMappingModalOpen] = useState(false);
@@ -43,7 +49,7 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
 
   // (일반 서비스용) 링크 연결 모달
   const [isServiceLinkModalOpen, setIsServiceLinkModalOpen] = useState(false);
-  const [serviceLinkTarget, setServiceLinkTarget] = useState<{ name: string; category: string } | null>(null);
+  const [serviceLinkTarget, setEditMappingTarget_2] = useState<{ name: string; category: string } | null>(null);
   const [serviceLinkInput, setServiceLinkInput] = useState("");
 
   useEffect(() => {
@@ -73,6 +79,26 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
 
   const aiServices = useMemo(() => Array.isArray(rawServices) ? (rawServices as AIService[]) : [], [rawServices]);
 
+  // 🌟 [추가] 리포트 정렬용 점수 계산 함수
+  const getReportSortScore = (label: string) => {
+    const yearMatch = label.match(/(\d{4})년/);
+    const monthMatch = label.match(/(\d{1,2})월/);
+    const weekMatch = label.match(/(\d)주차/);
+    const year = yearMatch ? parseInt(yearMatch[1]) : 2025;
+    const month = monthMatch ? parseInt(monthMatch[1]) : 0;
+    const week = weekMatch ? parseInt(weekMatch[1]) : 9; 
+    return year * 10000 + month * 100 + week;
+  };
+
+  // 🌟 [추가] 리포트 자체 날짜 최신순 정렬 로직 (최신 4개)
+  const sortedReports = useMemo(() => {
+    const combined = [
+      ...(Array.isArray(weeklySummaries) ? (weeklySummaries as any[]).map(s => ({ ...s, reportType: 'weekly', displayLabel: s.week_label })) : []),
+      ...(Array.isArray(monthlySummaries) ? (monthlySummaries as any[]).map(s => ({ ...s, reportType: 'monthly', displayLabel: s.month_label })) : [])
+    ];
+    return combined.sort((a, b) => getReportSortScore(b.displayLabel) - getReportSortScore(a.displayLabel)).slice(0, 4);
+  }, [weeklySummaries, monthlySummaries]);
+
   // 🌟 1위 모델명 깔끔하게 정리하는 함수
   const cleanModelName = (name: string) => {
     if (!name) return "";
@@ -85,7 +111,7 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
       .trim();
   };
 
-  // 🌟 [핵심] 주목할 AI 선정 로직 (요청사항 반영)
+  // 🌟 [핵심] 주목할 AI 선정 로직 (원본 보존)
   const featuredTools = useMemo(() => {
     const targetCategories = ["LLM", "IMAGE", "VIDEO", "TTS", "STT", "CODING"];
     
@@ -93,7 +119,6 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
       const config = CATEGORY_CONFIG[category];
       let selectedTool: any = null;
 
-      // 1. 해당 카테고리의 리포트가 있는지 확인
       if (allReports && (allReports as any[]).length > 0) {
         const relevantReport = (allReports as any[]).find(r => {
           const title = r.analysis_result?.report_title || "";
@@ -102,29 +127,18 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
 
         if (relevantReport?.analysis_result?.raw_data) {
           const rawData = relevantReport.analysis_result.raw_data;
-          
-          // 관리자가 설정한 매핑 데이터 확인
           const mappedName = relevantReport.analysis_result.mapped_service_name;
           const mappedUrl = relevantReport.analysis_result.mapped_service_url;
-
-          let modelName = mappedName; // 설정된 이름이 있으면 그걸 씀
+          let modelName = mappedName;
           let scoreDisplay = "";
 
-          // 설정된 이름이 없으면 1위 모델 찾기 (Fallback)
           if (!modelName) {
-            const top1 = 
-              rawData.test_benchmarks?.total_ranking?.[0] || 
-              rawData.vote_rankings?.overall?.[0] || 
-              rawData.vote_rankings?.sub_categories?.text_to_image?.items?.[0] || 
-              rawData.vote_rankings?.sub_categories?.text_to_video?.items?.[0];
-
+            const top1 = rawData.test_benchmarks?.total_ranking?.[0] || rawData.vote_rankings?.overall?.[0] || rawData.vote_rankings?.sub_categories?.text_to_image?.items?.[0] || rawData.vote_rankings?.sub_categories?.text_to_video?.items?.[0];
             if (top1) {
               modelName = cleanModelName(top1.model);
               scoreDisplay = top1.score ? `${top1.score}점` : (top1.elo ? `Elo ${top1.elo}` : "1위");
             }
-          } else {
-            scoreDisplay = "Rank 1";
-          }
+          } else { scoreDisplay = "Rank 1"; }
 
           if (modelName) {
             selectedTool = {
@@ -133,7 +147,6 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
               name: modelName,
               desc: `🏆 ${relevantReport.analysis_result.report_type || "분석"} 1위 (${scoreDisplay})`,
               category: category,
-              // 🚨 중요: 리포트 모드는 툴 메뉴 검색 안 함. 관리자가 입력한 URL만 사용.
               url: mappedUrl || "", 
               isBenchmark: true
             };
@@ -141,7 +154,6 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
         }
       }
 
-      // 2. 리포트가 없으면 -> '툴 메뉴'에서 가져오기 (기존 로직)
       if (!selectedTool) {
         const topService = aiServices
           .filter(s => s.category === category)
@@ -153,13 +165,12 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
             name: topService.name,
             desc: topService.description,
             category: category,
-            url: topService.url, // 툴 메뉴에 있는 URL 사용
-            isBenchmark: false // 이건 일반 서비스 모드
+            url: topService.url, 
+            isBenchmark: false 
           };
         }
       }
 
-      // 3. 아무것도 없으면 기본값
       if (!selectedTool) {
         const defaults: Record<string, any> = {
           LLM: { name: "Gemini 2.0", desc: "구글의 차세대 멀티모달 모델" },
@@ -178,12 +189,10 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
           isBenchmark: false
         };
       }
-
       return selectedTool;
     });
   }, [allReports, aiServices]);
 
-  // 핸들러
   const handleToolClick = (url?: string) => {
     if (url) window.open(url, "_blank");
     else alert("연결된 링크가 없습니다. 관리자가 곧 추가할 예정입니다! 🚧");
@@ -192,7 +201,12 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
   const handleNewsClick = (news: any) => { setSelectedNews(news); setIsNewsModalOpen(true); };
   const handleCloseNewsModal = () => { setSelectedNews(null); setIsNewsModalOpen(false); };
 
-  // ✏️ [리포트용] 수정 모달 열기 (이름 + 링크)
+  // 🌟 [추가] 리포트 클릭 핸들러
+  const handleReportClick = (report: any) => {
+    setSelectedReport(report);
+    setIsReportModalOpen(true);
+  };
+
   const openEditMappingModal = (e: React.MouseEvent, reportId: string, currentName: string, currentUrl: string) => {
     e.stopPropagation();
     setEditMappingTarget({ reportId, name: currentName, url: currentUrl });
@@ -201,7 +215,6 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
     setIsEditMappingModalOpen(true);
   };
 
-  // 💾 [리포트용] 저장 핸들러
   const handleSaveMapping = async () => {
     if (!editMappingTarget) return;
     const result = await updateReportMapping(editMappingTarget.reportId, editNameInput.trim(), editUrlInput.trim());
@@ -214,15 +227,13 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
     }
   };
 
-  // 🔗 [서비스용] 링크 연결 모달 열기 (기존)
   const openServiceLinkModal = (e: React.MouseEvent, name: string, category: string) => {
     e.stopPropagation();
-    setServiceLinkTarget({ name, category });
+    setEditMappingTarget_2({ name, category });
     setServiceLinkInput("");
     setIsServiceLinkModalOpen(true);
   };
 
-  // 💾 [서비스용] 링크 저장 핸들러
   const handleSaveServiceLink = async () => {
     if (!serviceLinkTarget || !serviceLinkInput.trim()) return;
     let finalUrl = serviceLinkInput.trim();
@@ -245,9 +256,6 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
       .reverse().slice(0, 3);
   }, [allNews]);
 
-  const latestWeeklySummary: any = Array.isArray(weeklySummaries) && weeklySummaries.length > 0 ? weeklySummaries[0] : null;
-  const latestMonthlySummary: any = Array.isArray(monthlySummaries) && monthlySummaries.length > 0 ? monthlySummaries[0] : null;
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans p-6 relative">
       <div className="max-w-7xl mx-auto">
@@ -267,10 +275,8 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
                     {isAdmin && (
                       <div className="absolute top-2 right-2 flex gap-1 z-20">
                         {tool.isBenchmark ? (
-                          // 🌟 리포트 모드: 이름/링크 통합 수정
                           <button onClick={(e) => openEditMappingModal(e, tool.reportId, tool.name, tool.url)} className="p-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full hover:bg-yellow-100 hover:text-yellow-600 transition-colors shadow-sm" title="설정(이름/링크)">✏️</button>
                         ) : (
-                          // 🌟 일반 툴 모드: 링크만 연결
                           <button onClick={(e) => openServiceLinkModal(e, tool.name, tool.category)} className="p-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition-colors shadow-sm" title="링크 연결">🔗</button>
                         )}
                       </div>
@@ -287,47 +293,80 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
            <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800"><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 뉴스</h2><button onClick={() => onMenuChange?.('news')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button></div>{recentNews && recentNews.length > 0 ? (<div className="space-y-4">{recentNews.slice(0, 5).map((news: any) => (<div key={news.id} onClick={() => handleNewsClick(news)} className="p-4 rounded-lg border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"><h3 className="font-semibold text-gray-900 dark:text-white mb-1">{news.title}</h3><p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{news.shortSummary || news.summary}</p><div className="flex items-center gap-2 mt-2 text-xs text-gray-400"><span>{new Date(news.publishedAt?.toDate?.() || news.createdAt || Date.now()).toLocaleDateString('ko-KR')}</span>{news.category && <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-700 rounded text-gray-600 dark:text-gray-300">{news.category}</span>}</div></div>))}</div>) : (<div className="text-center py-10 text-gray-400">뉴스가 없습니다.</div>)}</div>
-           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800"><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 리포트</h2><button onClick={() => onMenuChange?.('news')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button></div><div className="space-y-4">{latestMonthlySummary && (<div className="p-4 rounded-lg border border-purple-100 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-900/10"><div className="flex items-center gap-2 mb-2"><span className="text-lg">📅</span><span className="font-bold text-gray-900 dark:text-white">{latestMonthlySummary.month_label}</span></div><p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{latestMonthlySummary.summary}</p></div>)}{latestWeeklySummary && (<div className="p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10"><div className="flex items-center gap-2 mb-2"><span className="text-lg">📊</span><span className="font-bold text-gray-900 dark:text-white">{latestWeeklySummary.week_label}</span></div><p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{latestWeeklySummary.summary}</p></div>)}{!latestMonthlySummary && !latestWeeklySummary && (<div className="text-center py-10 text-gray-400">아직 리포트가 없습니다.</div>)}</div></div>
+           
+           {/* 🌟 [수정] 최근 리포트: 날짜순 정렬 및 클릭 이벤트 연결 */}
+           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800">
+             <div className="flex items-center justify-between mb-4">
+               <h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 리포트</h2>
+               {/* 🌟 [수정] 더보기 클릭 시 뉴스탭의 '타임라인'으로 이동 신호 전달 */}
+               <button onClick={() => onMenuChange?.('news', 'timeline')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button>
+             </div>
+             <div className="space-y-4">
+               {sortedReports.length > 0 ? sortedReports.map((report: any) => (
+                 <div 
+                   key={report.id} 
+                   onClick={() => handleReportClick(report)}
+                   className={`p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${
+                     report.reportType === 'monthly' 
+                     ? "border-purple-100 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-900/10" 
+                     : "border-blue-100 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10"
+                   }`}
+                 >
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="text-lg">{report.reportType === 'monthly' ? "📅" : "📊"}</span>
+                     <span className="font-bold text-gray-900 dark:text-white">{report.displayLabel}</span>
+                   </div>
+                   <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{report.summary}</p>
+                 </div>
+               )) : (<div className="text-center py-10 text-gray-400">아직 리포트가 없습니다.</div>)}
+             </div>
+           </div>
         </div>
       </div>
 
-      {/* 🌟 리포트 매핑 수정 모달 (이름 + 링크) */}
       {isEditMappingModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-zinc-700">
             <h3 className="text-xl font-bold mb-4 dark:text-white">✏️ 대시보드 표시 설정</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">이 카테고리의 1위 모델 이름과 연결할 링크를 직접 설정하세요.</p>
-            
             <label className="block text-xs font-bold text-gray-500 mb-1">표시 이름</label>
             <input type="text" className="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-3 mb-4 bg-gray-50 dark:bg-zinc-800 dark:text-white focus:ring-2 focus:ring-yellow-500" value={editNameInput} onChange={(e) => setEditNameInput(e.target.value)} placeholder="예: Claude 3.5 Sonnet" />
-            
             <label className="block text-xs font-bold text-gray-500 mb-1">연결 링크 URL</label>
             <input type="text" className="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-3 mb-4 bg-gray-50 dark:bg-zinc-800 dark:text-white focus:ring-2 focus:ring-yellow-500" value={editUrlInput} onChange={(e) => setEditUrlInput(e.target.value)} placeholder="https://..." />
-            
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setIsEditMappingModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">취소</button>
-              <button onClick={handleSaveMapping} className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-medium">저장하기</button>
-            </div>
+            <div className="flex justify-end gap-2"><button onClick={() => setIsEditMappingModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">취소</button><button onClick={handleSaveMapping} className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-medium">저장하기</button></div>
           </div>
         </div>
       )}
 
-      {/* 서비스 링크 연결 모달 (일반 툴용) */}
       {isServiceLinkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-md shadow-xl border border-gray-200 dark:border-zinc-700">
             <h3 className="text-xl font-bold mb-4 dark:text-white">🔗 서비스 링크 연결</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4"><span className="font-bold text-indigo-600">{serviceLinkTarget?.name}</span> 서비스의 URL을 입력하세요.</p>
             <input type="text" className="w-full border border-gray-300 dark:border-zinc-700 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-zinc-800 dark:text-white" placeholder="https://..." value={serviceLinkInput} onChange={(e) => setServiceLinkInput(e.target.value)} />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setIsServiceLinkModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">취소</button>
-              <button onClick={handleSaveServiceLink} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">연결하기</button>
-            </div>
+            <div className="flex justify-end gap-2"><button onClick={() => setIsServiceLinkModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">취소</button><button onClick={handleSaveServiceLink} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">연결하기</button></div>
           </div>
         </div>
       )}
 
       <NewsDetailModal isOpen={isNewsModalOpen} onClose={handleCloseNewsModal} news={selectedNews} />
+
+      {/* 🌟 [추가] 리포트 상세 모달 컴포넌트 */}
+      {/* 🌟 [수정] 분석 기간 표시를 위해 weekStartDate, weekEndDate 전달 로직 추가 */}
+      {/* 🌟 [수정] 분석 기간 표시를 위해 날짜 데이터를 추가로 전달합니다 */}
+      {isReportModalOpen && selectedReport && (
+        <SummaryModal 
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          type={selectedReport.reportType}
+          weekLabel={selectedReport.reportType === 'weekly' ? selectedReport.week_label : undefined}
+          // ✅ DB에서 가져온 시작/종료 날짜 정보를 Props로 전달
+          weekStartDate={selectedReport.reportType === 'weekly' ? (selectedReport.start_date || selectedReport.startDate) : undefined}
+          weekEndDate={selectedReport.reportType === 'weekly' ? (selectedReport.end_date || selectedReport.endDate) : undefined}
+          year={selectedReport.reportType === 'monthly' ? parseInt(selectedReport.month_label.match(/\d{4}/)?.[0] || "2025") : undefined}
+          month={selectedReport.reportType === 'monthly' ? parseInt(selectedReport.month_label.match(/(\d{1,2})월/)?.[1] || "1") : undefined}
+        />
+      )}
     </div>
   );
 }

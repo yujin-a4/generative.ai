@@ -136,7 +136,7 @@ export default function ServiceTab() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 영역 */}
         <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">AI 툴</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">AI 서비스</h1>
         </div>
 
         {/* 카테고리 필터 */}

@@ -5,50 +5,59 @@ import * as cheerio from "cheerio";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function analyzeNewsArticle(url: string) {
-  console.log("🔍 분석 시작 URL:", url);
+// 🌟 [수정] manualText 인자를 선택적(optional)으로 추가
+export async function analyzeNewsArticle(url: string, manualText?: string) {
+  console.log("🔍 분석 시작 URL:", url, manualText ? "(본문 직접 입력됨)" : "");
 
   try {
-    // 1. URL에서 HTML 가져오기
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-      }
-    });
-    
-    if (!response.ok) throw new Error(`사이트 접속 실패 (${response.status})`);
-    
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    
-    // 불필요한 태그 제거
-    $("script, style, nav, footer, header, aside, iframe").remove();
-    
-    // 본문 텍스트 추출
-    const title = $("title").text().trim() || $("meta[property='og:title']").attr("content") || "";
-    
-    // 본문 추출 시도
-    let bodyText = $("article").text() || $("#content").text() || $(".article_view").text() || $("main").text() || $("body").text();
-    bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
+    let bodyText = "";
+    let title = "";
 
-    console.log("✅ 본문 추출 완료 (길이):", bodyText.length);
+    // 1. 수동 입력 텍스트가 있는 경우 크롤링을 건너뛰고 바로 사용
+    if (manualText && manualText.trim().length > 0) {
+      bodyText = manualText.trim().slice(0, 15000);
+      title = "직접 입력된 콘텐츠"; // 분석 전 임시 제목
+      console.log("✅ 수동 입력 본문 사용 (길이):", bodyText.length);
+    } 
+    // 2. 수동 입력이 없는 경우 기존 방식대로 URL에서 HTML 가져오기
+    else {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+      });
+      
+      if (!response.ok) throw new Error(`사이트 접속 실패 (${response.status})`);
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $("script, style, nav, footer, header, aside, iframe").remove();
+      
+      title = $("title").text().trim() || $("meta[property='og:title']").attr("content") || "";
+      
+      bodyText = $("article").text() || $("#content").text() || $(".article_view").text() || $("main").text() || $("body").text();
+      bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
 
-    if (bodyText.length < 50) throw new Error("본문 내용을 추출할 수 없습니다.");
+      console.log("✅ 본문 추출 완료 (길이):", bodyText.length);
 
-    // 2. Gemini 모델 설정
+      if (bodyText.length < 50) throw new Error("본문 내용을 추출할 수 없습니다.");
+    }
+
+    // 3. Gemini 모델 설정
     const model = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash-exp", 
         generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 3. 프롬프트 작성
+    // 4. 프롬프트 작성
     const prompt = `
     다음 뉴스 기사를 분석하고 JSON 포맷으로 요약해줘.
     
     [기사 정보]
     - URL: ${url}
     - 제목: ${title}
-    - 본문 일부: ${bodyText}
+    - 본문 내용: ${bodyText}
 
     [필수 요청 사항]
     1. shortSummary: 뉴스 목록 카드에 들어갈 50자 이내의 아주 핵심적인 한 줄 요약 (한국어).
@@ -81,7 +90,6 @@ export async function analyzeNewsArticle(url: string) {
     try {
         let parsedData = JSON.parse(text);
 
-        // 🛠️ [수정] 만약 결과가 배열([])로 왔다면 첫 번째 요소를 사용
         if (Array.isArray(parsedData)) {
             console.log("⚠️ 배열 형태로 반환됨, 첫 번째 요소 추출");
             parsedData = parsedData[0];
@@ -106,7 +114,7 @@ export async function analyzeNewsArticle(url: string) {
   }
 }
 
-// 🌟 [추가] 대시보드 헤드라인 생성용 함수
+// 🌟 [유지] 대시보드 헤드라인 생성용 함수 (변경 없음)
 export async function generateTrendHeadline(newsList: { title: string; summary: string }[]) {
   if (!newsList || newsList.length === 0) {
     return { headline: "현재 분석할 뉴스가 충분하지 않습니다." };

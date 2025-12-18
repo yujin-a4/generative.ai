@@ -79,7 +79,7 @@ app/
   shortSummary: string;
   detailedSummary: string[];
   insight: string;
-  category: string;  // "에듀테크 x AI", "AI 기술", "AI 툴/플랫폼" 등
+  category: string;  // "에듀테크 x AI", "AI 기술", "AI 서비스/플랫폼" 등
   tags: string[];
   publishedAt: Timestamp;
   createdAt: Timestamp;

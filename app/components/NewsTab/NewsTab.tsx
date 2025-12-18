@@ -11,17 +11,29 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import SearchBar from "./SearchBar"; 
 
-export default function NewsTab() {
+// 🌟 [추가] 초기 뷰를 위한 Props 정의
+interface NewsTabProps {
+  initialView?: "timeline" | "category" | "bookmarks";
+}
+
+export default function NewsTab({ initialView }: NewsTabProps) {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [selectedNews, setSelectedNews] = useState<NewsArticle | null>(null);
   const [editTarget, setEditTarget] = useState<NewsArticle | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // 기본 뷰 모드: category
-  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">("category");
+  // 🌟 [수정] initialView 정보가 있으면 해당 모드로 초기화
+  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">(initialView || "category");
   
   // 타임라인용 검색어 (사용하지 않지만 상태는 유지)
   const [searchKeyword, setSearchKeyword] = useState(""); 
+
+  // 🌟 [추가] 외부(대시보드 더보기 등)에서 정보가 변경될 때 반영
+  useEffect(() => {
+    if (initialView) {
+      setViewMode(initialView);
+    }
+  }, [initialView]);
 
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 

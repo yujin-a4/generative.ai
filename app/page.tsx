@@ -14,6 +14,9 @@ function MainContent() {
   const [activeMenu, setActiveMenu] = useState<MenuType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // 🌟 [추가] 뉴스 탭의 초기 뷰를 결정하는 상태
+  const [newsInitialView, setNewsInitialView] = useState<string | undefined>(undefined);
+
   // 로컬 스토리지에서 랜딩 화면 표시 여부 확인
   useEffect(() => {
     const hasSeenLanding = localStorage.getItem('hasSeenLanding');
@@ -27,18 +30,28 @@ function MainContent() {
     setShowLanding(false);
   };
 
+  // 🌟 [추가] 대시보드에서 보낸 'timeline' 정보를 처리하는 핸들러
+  const handleMenuChange = (menu: MenuType, subView?: string) => {
+    setActiveMenu(menu);
+    if (menu === 'news') {
+      setNewsInitialView(subView); // 'timeline' 정보 저장
+    } else {
+      setNewsInitialView(undefined);
+    }
+  };
+
   const renderContent = () => {
     switch (activeMenu) {
       case 'dashboard':
-        return <Dashboard onMenuChange={setActiveMenu} />;
+        return <Dashboard onMenuChange={handleMenuChange} />; // 🌟 setActiveMenu 대신 handleMenuChange 사용
       case 'news':
-        return <NewsTab />;
+        return <NewsTab initialView={newsInitialView as any} />; // 🌟 초기 뷰 값 전달
       case 'services':
         return <ServiceTab />;
       case 'reports':
         return <ReportTab />;
       default:
-        return <Dashboard onMenuChange={setActiveMenu} />;
+        return <Dashboard onMenuChange={handleMenuChange} />;
     }
   };
 
@@ -52,7 +65,7 @@ function MainContent() {
         {/* 사이드바 */}
         <Sidebar 
           activeMenu={activeMenu} 
-          onMenuChange={setActiveMenu}
+          onMenuChange={handleMenuChange} // 🌟 handleMenuChange로 교체
           isCollapsed={sidebarCollapsed}
           onCollapseChange={setSidebarCollapsed}
         />

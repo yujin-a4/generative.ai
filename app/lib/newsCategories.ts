@@ -15,10 +15,10 @@ export const NEWS_CATEGORIES = {
     },
     AI_TOOLS: {
       id: 'AI_TOOLS',
-      name: 'AI 툴/플랫폼',
+      name: 'AI 서비스/플랫폼',
       icon: '🛠️',
       color: 'bg-purple-100 text-purple-800 border-purple-200',
-      description: '개발자/비개발자가 사용하는 AI 툴, API, 플랫폼'
+      description: 'AI 기반 서비스, API, 플랫폼'
     },
     INDUSTRY_TREND: {
       id: 'INDUSTRY_TREND',

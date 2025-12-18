@@ -16,7 +16,7 @@ const CATEGORIES = [
   { id: "ALL", label: "전체", icon: "📋" },
   { id: "EDUTECH_AI", label: "에듀테크 x AI", icon: "🎓" },
   { id: "AI_TECH", label: "AI 기술", icon: "🤖" },
-  { id: "AI_TOOLS", label: "AI 툴/플랫폼", icon: "🛠️" },
+  { id: "AI_TOOLS", label: "AI 서비스/플랫폼", icon: "🛠️" },
   { id: "INDUSTRY_TREND", label: "업계 동향", icon: "📊" },
   { id: "COMPANY_NEWS", label: "기업/투자", icon: "💼" },
   { id: "POLICY_ETHICS", label: "정책/규제", icon: "📜" },

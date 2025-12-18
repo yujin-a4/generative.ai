@@ -10,6 +10,7 @@ export interface NewsArticle {
   url: string;
   title: string;
   source: string;
+  author?: string; // 🌟 [추가] 작성자 이름 필드
   shortSummary: string;
   detailedSummary: string[];
   insight: string;

@@ -20,7 +20,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
   const menuItems = [
     { id: 'dashboard' as MenuType, label: '대시보드', icon: '📊' },
     { id: 'news' as MenuType, label: 'AI 뉴스', icon: '📰' },
-    { id: 'services' as MenuType, label: 'AI 툴', icon: '💻' },
+    { id: 'services' as MenuType, label: 'AI 서비스', icon: '💻' },
     { id: 'reports' as MenuType, label: 'AI 순위', icon: '🏆' },
   ];
 
@@ -97,7 +97,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
             YBM AI Lab
           </p>
           {/* 크기 up (text-[10px] -> text-xs) & 색상 진하게 (gray-300 -> gray-400) */}
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-300 dark:text-gray-500 mt-0.5">
             Yujin Kang
           </p>
         </div>
