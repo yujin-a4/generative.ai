@@ -62,7 +62,7 @@ export default function NewsTab({ initialView }: NewsTabProps) {
         {/* 🛠️ [수정] items-center를 items-end로 변경하여 버튼을 아래로 내림 */}
         <div className="flex flex-col md:flex-row justify-between items-end gap-6">
           <div className="flex-1">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <span className="text-3xl">📰</span> AI 뉴스 모아보기
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 leading-relaxed">

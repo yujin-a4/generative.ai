@@ -95,7 +95,7 @@ export default function ReportTab() {
     <div className="w-full">
       {/* 1. 메인 헤더 영역 (기존 유지) */}
       <div className="max-w-7xl mx-auto px-6 pt-8 mb-4">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">AI 순위 리포트</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">AI 순위 리포트</h1>
         <p className="text-gray-500 dark:text-gray-400">
           공신력 있는 벤치마크 데이터를 기반으로 한 분야별 모델 성능 순위를 확인하세요.
         </p>
