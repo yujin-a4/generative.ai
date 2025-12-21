@@ -172,8 +172,12 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
         {news.title}
       </h3>
 
-      <div className="text-xs font-semibold text-gray-500 mb-3">
-        {news.source}
+      {/* 🛠️ [수정] 출처와 작성자 이름을 한 줄에 배치 (작성자는 오른쪽 끝) */}
+      <div className="text-xs font-semibold text-gray-500 mb-3 flex justify-between items-center">
+        <span>{news.source}</span>
+        {news.author && (
+          <span className="text-[10px] text-gray-400 font-medium">작성자: {news.author}</span>
+        )}
       </div>
 
       {!hideSummary && (

@@ -132,7 +132,9 @@ export default function ServiceTab() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans p-6">
+    // 🛠️ [수정] 패딩을 px-4 py-8로 변경
+    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-6 py-8">
+      {/* 🛠️ [수정] 최대 너비를 max-w-6xl로 변경 및 중앙 정렬 */}
       <div className="max-w-7xl mx-auto">
         {/* 헤더 영역 */}
         <div className="mb-6">

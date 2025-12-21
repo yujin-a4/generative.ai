@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getRecentNews, getBookmarkedNews, NewsArticle } from "@/app/lib/newsService"; 
+// 🛠️ 5번 줄에 있던 중복 코드는 삭제하고 아래 하나로 합칩니다.
+import { 
+  getRecentNews, 
+  getBookmarkedNews, 
+  NewsArticle, 
+  migrateNewsCategories 
+} from "@/app/lib/newsService"; 
+
 import NewsCard from "./NewsCard";
 import { getExtendedSearchTerms } from "@/app/lib/searchUtils"; 
 import { auth } from "@/lib/firebase"; 
@@ -16,12 +23,11 @@ const CATEGORIES = [
   { id: "ALL", label: "전체", icon: "📋" },
   { id: "EDUTECH_AI", label: "에듀테크 x AI", icon: "🎓" },
   { id: "AI_TECH", label: "AI 기술", icon: "🤖" },
-  { id: "AI_TOOLS", label: "AI 서비스/플랫폼", icon: "🛠️" },
-  { id: "INDUSTRY_TREND", label: "업계 동향", icon: "📊" },
-  { id: "COMPANY_NEWS", label: "기업/투자", icon: "💼" },
-  { id: "POLICY_ETHICS", label: "정책/규제", icon: "📜" },
-  { id: "RESEARCH", label: "연구/논문", icon: "📚" },
-  { id: "PRODUCT_RELEASE", label: "신제품 출시", icon: "🚀" },
+  { id: "AI_SERVICE", label: "AI 서비스/플랫폼", icon: "🛠️" },
+  { id: "NEW_PRODUCT", label: "신제품 출시", icon: "🚀" },
+  { id: "TREND", label: "업계 동향", icon: "📊" },
+  { id: "INVESTMENT", label: "기업/투자", icon: "💼" },
+  { id: "POLICY", label: "정책/규제", icon: "⚖️" },
 ];
 
 interface CategoryViewProps {
@@ -37,7 +43,10 @@ export default function CategoryView({
   const [user, setUser] = useState(auth.currentUser);
   const [filterCategory, setFilterCategory] = useState("ALL");
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [sortBy, setSortBy] = useState<"latest" | "likes">("latest");
+
+  // 🛠️ [수정] "created" 타입을 추가하여 등록순 정렬이 가능하게 합니다.
+  const [sortBy, setSortBy] = useState<"latest" | "likes" | "created">("latest");
+  
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
@@ -49,12 +58,13 @@ export default function CategoryView({
     return () => unsubscribe();
   }, []);
 
-  // 데이터 캐싱
-  const { data: newsList = [], isLoading: loading, refetch } = useQuery({
-    queryKey: ['news', 'category', sortBy],
-    queryFn: () => getRecentNews(100, sortBy),
-    staleTime: 1000 * 60 * 3,
-  });
+// 데이터 캐싱
+const { data: newsList = [], isLoading: loading, refetch } = useQuery({
+  // [참고] sortBy가 "created"로 바뀌면 queryKey도 자동으로 바뀌어 데이터가 갱신됩니다.
+  queryKey: ['news', 'category', sortBy],
+  queryFn: () => getRecentNews(100, sortBy),
+  staleTime: 1000 * 60 * 3,
+});
 
   // refreshKey 변경 시 refetch
   useEffect(() => {
@@ -63,11 +73,22 @@ export default function CategoryView({
     }
   }, [refreshKey, refetch]);
 
-  // 필터링
+
+  // CategoryView.tsx 내의 filteredList 부분 수정
   const filteredList = newsList.filter((news) => {
-    // 카테고리 필터 (이제 영문 ID끼리 비교하므로 정상 작동합니다)
-    const categoryMatch = filterCategory === "ALL" || news.category === filterCategory;
-    
+    // 🌟 [수정] 구버전 ID를 신버전 ID로 인식하게 해주는 로직 추가
+    let effectiveCategory = news.category;
+    if (effectiveCategory === 'RESEARCH') effectiveCategory = 'AI_TECH';
+    if (effectiveCategory === 'AI_TOOLS') effectiveCategory = 'AI_SERVICE';
+    if (effectiveCategory === 'INDUSTRY_TREND') effectiveCategory = 'TREND';
+    if (effectiveCategory === 'COMPANY_NEWS') effectiveCategory = 'INVESTMENT';
+    if (effectiveCategory === 'POLICY_ETHICS') effectiveCategory = 'POLICY';
+    if (effectiveCategory === 'PRODUCT_RELEASE') effectiveCategory = 'NEW_PRODUCT';
+
+  const categoryMatch = filterCategory === "ALL" || effectiveCategory === filterCategory;
+  
+  // ... 나머지 검색어 및 날짜 필터 로직 유지
+
     // 검색어 필터
     let keywordMatch = true;
     if (searchKeyword.trim()) {
@@ -105,10 +126,10 @@ export default function CategoryView({
 
   if (loading) return <NewsLoading />;
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      {/* 카테고리 버튼 (크게 잘 보이게) */}
-      <div className="mb-6">
+return (
+    <div className="w-full">
+      {/* 🛠️ [수정] 버튼 모양(rounded-xl)은 유지하고, AI 서비스와 같은 카드 컨테이너에 담았습니다. */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 mb-6 border border-gray-200 dark:border-zinc-800 shadow-sm">
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => (
             <button

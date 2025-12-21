@@ -219,7 +219,7 @@ export default function NewsTimeline({
 
   return (
     <>
-      <div className="space-y-4 max-w-5xl mx-auto">
+      <div className="w-full">
         {sortedMonths.map((month) => {
           const isExpanded = expandedMonths.has(month.label);
           const totalNews = month.weeks.reduce((sum, week) => sum + week.news.length, 0);

@@ -16,13 +16,15 @@ interface NewsListProps {
   onRefresh: () => void;
   filterCategory: string;
   searchKeyword: string;
-  sortBy?: "latest" | "likes"; 
+  // 🌟 [수정] 'created' 타입 추가
+  sortBy?: "latest" | "likes" | "created"; 
   onlyBookmarked?: boolean;
   startDate?: string | null;
   endDate?: string | null;
 }
 
 export default function NewsList({ 
+  // 🌟 [수정] sortBy 기본값 유지하며 타입 수용
   refreshKey, onNewsClick, onNewsEdit, onRefresh, filterCategory, searchKeyword, sortBy = "latest", onlyBookmarked = false, startDate, endDate 
 }: NewsListProps) {
   const [user, setUser] = useState(auth.currentUser);

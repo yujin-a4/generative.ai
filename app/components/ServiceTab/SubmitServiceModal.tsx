@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { AIService, SERVICE_CATEGORIES, ServiceCategory } from "@/types/service";
 import { analyzeService, createService, updateService } from "@/app/actions/serviceActions";
+// 🌟 [추가] 유저 정보를 가져오기 위해 auth 임포트
+import { auth } from "@/lib/firebase";
 
 interface SubmitServiceModalProps {
   isOpen: boolean;
@@ -128,12 +130,16 @@ export default function SubmitServiceModal({ isOpen, onClose, initialData, onSuc
     }
 
     setIsLoading(true);
+    // 🌟 [추가] 현재 유저 ID 확보
+    const user = auth.currentUser;
+    
     try {
       if (initialData && initialData.id) {
         await updateService(initialData.id, formData);
         alert("수정되었습니다.");
       } else {
-        await createService(formData as AIService);
+        // 🌟 [수정] 등록 시 authorId 포함하여 전송
+        await createService({ ...formData, authorId: user?.uid } as AIService);
         alert("등록되었습니다.");
       }
       onSuccess();

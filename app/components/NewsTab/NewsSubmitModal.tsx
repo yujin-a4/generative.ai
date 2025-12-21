@@ -289,15 +289,21 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 </div>
                 <div>
                    <label className="text-xs font-bold text-gray-500 uppercase">카테고리</label>
+                
+                   // [수정] select 태그 부분에서 카테고리 정보를 가져오는 방식 변경
                    <select 
-                      value={analysisData.category}
-                      onChange={(e) => setAnalysisData({...analysisData, category: e.target.value})}
-                      className="w-full mt-1 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md text-sm cursor-pointer"
+                     value={analysisData.category}
+                     onChange={(e) => setAnalysisData({...analysisData, category: e.target.value})}
+                     className="w-full mt-1 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md text-sm cursor-pointer"
                    >
-                     {Object.values(NEWS_CATEGORIES).map((cat: any) => (
-                       <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                     {/* NEWS_CATEGORIES 객체를 기반으로 옵션 생성 */}
+                     {Object.values(NEWS_CATEGORIES).map((cat) => (
+                       <option key={cat.id} value={cat.id}>
+                         {cat.icon} {cat.name}
+                       </option>
                      ))}
                    </select>
+
                 </div>
               </div>
 

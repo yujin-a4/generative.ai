@@ -12,14 +12,13 @@ interface CategoryDropdownProps {
 
 const CATEGORIES = [
   { id: "ALL", label: "전체", icon: "📋" },
-  { id: "에듀테크 x AI", label: "에듀테크 x AI", icon: "🎓" },
-  { id: "AI 기술", label: "AI 기술", icon: "🤖" },
-  { id: "AI 서비스/플랫폼", label: "AI 서비스/플랫폼", icon: "🛠️" },
-  { id: "업계 동향", label: "업계 동향", icon: "📊" },
-  { id: "기업/투자", label: "기업/투자", icon: "💼" },
-  { id: "정책/규제", label: "정책/규제", icon: "📜" },
-  { id: "연구/논문", label: "연구/논문", icon: "📚" },
-  { id: "신제품 출시", label: "신제품 출시", icon: "🚀" },
+  { id: "EDUTECH_AI", label: "에듀테크 x AI", icon: "🎓" },
+  { id: "AI_TECH", label: "AI 기술", icon: "🤖" },
+  { id: "AI_SERVICE", label: "AI 서비스/플랫폼", icon: "🛠️" },
+  { id: "TREND", label: "업계 동향", icon: "📊" },
+  { id: "INVESTMENT", label: "기업/투자", icon: "💼" },
+  { id: "POLICY", label: "정책/규제", icon: "⚖️" },
+  { id: "NEW_PRODUCT", label: "신제품 출시", icon: "🚀" },
 ];
 
 export function CategoryDropdown({ selected, onSelect }: CategoryDropdownProps) {
@@ -220,8 +219,9 @@ export function DateDropdown({ startDate, endDate, onChangeStart, onChangeEnd }:
 // 정렬 드롭다운
 // =====================
 interface SortDropdownProps {
-  selected: "latest" | "likes";
-  onSelect: (sort: "latest" | "likes") => void;
+  // 🌟 [수정] 'created' 타입 추가
+  selected: "latest" | "likes" | "created";
+  onSelect: (sort: "latest" | "likes" | "created") => void;
 }
 
 export function SortDropdown({ selected, onSelect }: SortDropdownProps) {
@@ -240,6 +240,8 @@ export function SortDropdown({ selected, onSelect }: SortDropdownProps) {
 
   const options = [
     { id: "latest" as const, label: "최신순", icon: "🕒" },
+    // 🌟 [추가] 최신순 바로 아래에 등록순 배치
+    { id: "created" as const, label: "등록순", icon: "🆕" },
     { id: "likes" as const, label: "좋아요순", icon: "🔥" },
   ];
 

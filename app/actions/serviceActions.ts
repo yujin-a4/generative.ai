@@ -60,6 +60,9 @@ function mapDocToService(docSnapshot: any): AIService {
     
     thumbnailUrl: data.thumbnailUrl || data.ogImage || "",
     
+    // 🌟 [추가] 작성자 ID 매핑
+    authorId: data.authorId || "",
+    
     // 배열 필드가 없으면 빈 배열로 초기화 (UI 깨짐 방지)
     pros: Array.isArray(data.pros) ? data.pros : [],
     cons: Array.isArray(data.cons) ? data.cons : [],

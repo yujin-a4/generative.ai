@@ -39,6 +39,7 @@ export default function ServiceCard({ service, onEdit, onDelete }: ServiceCardPr
     return () => unsubscribe();
   }, [service.likedBy, service.bookmarkedBy]);
 
+  
   const handleCardClick = () => {
     if (service.url) window.open(service.url, "_blank");
   };
@@ -63,6 +64,9 @@ export default function ServiceCard({ service, onEdit, onDelete }: ServiceCardPr
       setLikesCount(prev => (prevLiked ? prev + 1 : prev - 1));
     }
   };
+
+// 🌟 [추가] 내가 등록한 서비스인지 확인하는 로직 - 251221
+const isOwner = currentUser && service.authorId === currentUser.uid;
 
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -99,15 +103,14 @@ export default function ServiceCard({ service, onEdit, onDelete }: ServiceCardPr
       onClick={handleCardClick}
       className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col relative"
     >
-      {/* 1. 상단: 카테고리 (왼쪽) + 관리자 버튼 (오른쪽) */}
       <div className="flex justify-between items-start mb-3">
         <span className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 rounded border border-indigo-100 dark:border-indigo-800">
           {categoryLabel}
         </span>
         
-        {/* 관리자 버튼 (호버 시 표시) */}
+        {/* 🌟 [수정] 관리자이거나 '작성자 본인'인 경우에만 버튼 표시 */}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {isAdmin && (
+          {(isAdmin || isOwner) && (
             <>
               <button onClick={handleEditClick} className="p-1 text-gray-400 hover:text-indigo-600">✎</button>
               <button onClick={handleDeleteClick} className="p-1 text-gray-400 hover:text-red-600">🗑️</button>

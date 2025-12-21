@@ -80,7 +80,7 @@ export default function BookmarkView({
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       {/* 필터 바 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 pb-4 border-b border-gray-200 dark:border-zinc-800">
         <CategoryDropdown 

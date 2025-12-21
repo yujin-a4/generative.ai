@@ -93,17 +93,25 @@ export default function ReportTab() {
 
   return (
     <div className="w-full">
-      {/* 2차 탭 네비게이션 */}
-      <div className="bg-gray-50 dark:bg-black border-b border-gray-200 dark:border-zinc-800 px-4 mb-8">
-        <div className="max-w-5xl mx-auto flex overflow-x-auto no-scrollbar space-x-4 md:space-x-8">
+      {/* 1. 메인 헤더 영역 (기존 유지) */}
+      <div className="max-w-7xl mx-auto px-6 pt-8 mb-4">
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">AI 순위 리포트</h1>
+        <p className="text-gray-500 dark:text-gray-400">
+          공신력 있는 벤치마크 데이터를 기반으로 한 분야별 모델 성능 순위를 확인하세요.
+        </p>
+      </div>
+
+      {/* 🛠️ [수정] 2. 탭 네비게이션: AI 뉴스 스타일로 통일 (카드 컨테이너 적용) */}
+      <div className="max-w-7xl mx-auto px-6 mb-8">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 shadow-sm flex overflow-x-auto no-scrollbar gap-2">
           {REPORT_CATEGORIES.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
-              className={`py-3 px-2 text-sm font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors flex items-center gap-2
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2
                 ${activeCategory === cat.id
-                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                    : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                 }`}
             >
               <span className="text-lg">{cat.icon}</span>
@@ -113,21 +121,13 @@ export default function ReportTab() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4">
-        {/* 서브 헤더 & 트렌드 버튼 */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-8 pb-4 border-b border-gray-200 dark:border-zinc-800">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              {currentCatInfo?.icon} {currentCatInfo?.label} 리포트
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {currentCatInfo?.label} 관련 최신 분석을 확인하세요.
-            </p>
-          </div>
-          
+      {/* 3. 실제 리포트 컨텐츠 영역 */}
+      <div className="max-w-7xl mx-auto px-6 pb-12">
+      {/* 🛠️ [수정] 빨간색 네모 부분(중복 제목) 삭제 및 버튼만 우측 정렬 */}
+      <div className="flex justify-end mb-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
           <Link 
             href={`/trends?category=${encodeURIComponent(currentCatInfo?.searchKey || "")}`}
-            className="mt-4 md:mt-0 inline-flex items-center px-5 py-2.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:shadow-md transition-all group"
+            className="inline-flex items-center px-5 py-2.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:shadow-md transition-all group"
           >
             <span>📈 기간별 분석 보기</span>
             <span className="ml-2 group-hover:translate-x-1 transition-transform">→</span>
@@ -142,10 +142,11 @@ export default function ReportTab() {
           </div>
         ) : filteredReports.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
-            {filteredReports.map((report) => (
-              <Link href={`/report/${report.id}`} key={report.id} className="group block relative">
-                 <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-200 dark:border-zinc-800 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col relative">
-                  
+       
+       {/* 리포트 그리드 영역 내부의 카드 컴포넌트 */}
+       {filteredReports.map((report) => (
+         <Link href={`/report/${report.id}`} key={report.id} className="group block relative">
+           <div className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-200 dark:border-zinc-800 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col relative">
                   {isAdmin && (
                     <button
                       onClick={(e) => handleDeleteReport(e, report.id)}
@@ -166,30 +167,51 @@ export default function ReportTab() {
                       {report.analysis_result?.report_title || "분석 리포트"}
                     </h3>
                   </div>
+
                   <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+                    <div className="flex items-center gap-2 text-xs text-gray-400 mb-5">
                       <span>📅 {formatDate(report.created_at)}</span>
                     </div>
                     
-                    {/* 🌟 수정된 부분: 모든 리포트 타입에 대해 공통 요약 UI 적용 */}
-                    <div className="space-y-2 mb-6 flex-1">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 line-clamp-1 flex items-center gap-2">
-                        <span className="text-lg">{SUMMARY_ICONS[0]}</span>
-                        {report.analysis_result?.summary_insights?.[0] || "총평 요약 생성 중..."}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 flex items-center gap-2">
-                        <span className="text-lg">{SUMMARY_ICONS[1]}</span>
-                        {report.analysis_result?.summary_insights?.[1] || "추가 분석 내용 없음"}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center text-indigo-600 font-semibold text-sm group-hover:underline">
-                      상세 리포트 보기 &rarr;
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
+        {/* 🛠️ [수정] 줄글 요약 대신 TOP 3 순위 리스트 표시 */}
+        <div className="space-y-2.5 mb-8 flex-1">
+          {report.analysis_result?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 3).map((item: any, idx: number) => (
+            <div 
+              key={idx} 
+              className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800 group-hover:border-indigo-100 dark:group-hover:border-indigo-900/30 transition-colors"
+            >
+              <div className="flex items-center gap-3 overflow-hidden">
+                {/* 순위 배지 */}
+                <span className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[11px] font-black shadow-sm ${
+                  idx === 0 ? "bg-yellow-400 text-white" :
+                  idx === 1 ? "bg-slate-300 text-gray-700" :
+                  "bg-orange-300 text-white"
+                }`}>
+                  {idx + 1}
+                </span>
+                {/* 모델명 (말줄임 처리) */}
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">
+                  {item.model.split('/').pop()?.replace(/-/g, ' ')}
+                </span>
+              </div>
+              {/* 점수 또는 등급 */}
+              <span className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md">
+                {item.score || item.elo || "TOP"}
+              </span>
+            </div>
+          )) || (
+            // 데이터가 없는 경우 폴백 메시지
+            <p className="text-sm text-gray-400 italic text-center py-4">순위 정보를 불러오는 중...</p>
+          )}
+        </div>
+        
+        <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-bold text-sm group-hover:translate-x-1 transition-transform">
+          상세 리포트 보기 <span className="ml-1">→</span>
+        </div>
+      </div>
+    </div>
+  </Link>
+))}
           </div>
         ) : (
           <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-gray-300">

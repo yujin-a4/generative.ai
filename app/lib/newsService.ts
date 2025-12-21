@@ -79,14 +79,17 @@ export async function deleteNews(id: string) {
   }
 }
 
-// 목록 가져오기 (정렬 포함)
-export async function getRecentNews(limitCount = 20, sortBy: 'latest' | 'likes' = 'latest') {
+// [수정] sortBy 타입에 'created' 추가
+export async function getRecentNews(limitCount = 20, sortBy: 'latest' | 'likes' | 'created' = 'latest') {
   try {
     const newsCollection = collection(db, "news");
     let q;
 
     if (sortBy === 'likes') {
       q = query(newsCollection, orderBy("likes", "desc"), limit(limitCount));
+    } else if (sortBy === 'created') {
+      // 🌟 [추가] 등록순(createdAt) 정렬 로직
+      q = query(newsCollection, orderBy("createdAt", "desc"), limit(limitCount));
     } else {
       q = query(newsCollection, orderBy("publishedAt", "desc"), limit(limitCount));
     }
@@ -411,4 +414,45 @@ export async function getRecentHeadlines(days = 14) {
     console.error("Error fetching headlines:", error);
     return [];
   }
+}
+
+
+/**
+ * 🛠️ [마이그레이션] 기존 뉴스 카테고리를 새로운 ID 체계로 일괄 변경합니다.
+ */
+export async function migrateNewsCategories() {
+  const newsCollection = collection(db, "news");
+  const querySnapshot = await getDocs(newsCollection);
+  
+  // 구버전 ID -> 신버전 ID 매핑 테이블
+  const MIGRATION_MAP: Record<string, string> = {
+    'RESEARCH': 'AI_TECH',
+    'AI_TOOLS': 'AI_SERVICE',
+    'INDUSTRY_TREND': 'TREND',
+    'COMPANY_NEWS': 'INVESTMENT',
+    'POLICY_ETHICS': 'POLICY',
+    'PRODUCT_RELEASE': 'NEW_PRODUCT'
+  };
+
+  let count = 0;
+
+  console.log("🚀 카테고리 마이그레이션 시작...");
+
+  for (const newsDoc of querySnapshot.docs) {
+    const data = newsDoc.data();
+    const oldCategory = data.category;
+
+    // 매핑 테이블에 해당되는 구버전 카테고리가 있다면 업데이트
+    if (MIGRATION_MAP[oldCategory]) {
+      const newsRef = doc(db, "news", newsDoc.id);
+      await updateDoc(newsRef, {
+        category: MIGRATION_MAP[oldCategory]
+      });
+      console.log(`✅ [${newsDoc.id}] ${oldCategory} -> ${MIGRATION_MAP[oldCategory]} 변경 완료`);
+      count++;
+    }
+  }
+
+  console.log(`✨ 총 ${count}개의 뉴스 카테고리가 성공적으로 업데이트되었습니다.`);
+  return count;
 }

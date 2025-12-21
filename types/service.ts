@@ -39,6 +39,9 @@ export interface AIService {
   likedBy?: string[];
   bookmarkedBy?: string[];
 
+  // 🌟 [추가] 작성자 식별을 위한 ID 필드
+  authorId?: string;
+
   // 날짜는 문자열이나 객체 모두 허용 (유연성 확보)
   createdAt?: any; 
   updatedAt?: any;
