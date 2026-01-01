@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { analyzeNewsArticle } from "@/app/actions/analyzeNews";
 import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
 import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService";
-import { auth } from "@/lib/firebase"; // 🌟 [추가] 사용자 정보를 가져오기 위해 임포트
+import { auth } from "@/lib/firebase";
 
-// 🌟 [유지] 사이트 그룹 통합 및 개별 색상 적용
 const SITE_GROUPS = [
   {
     title: "🇰🇷 국내 AI/IT 핵심",
@@ -90,7 +89,7 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
       setAnalysisData({ 
         ...initialData, 
         date: dateStr,
-        author: initialData.author || "" // 🌟 기존 작성자 정보 로드
+        author: initialData.author || "" 
       });
     } else if (isOpen && !initialData) {
       setStep("INPUT");
@@ -102,6 +101,13 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
     }
   }, [isOpen, initialData]);
 
+  // 🌟 [추가] 상세 요약(detailedSummary)의 특정 인덱스를 수정하는 핸들러
+  const handleDetailedSummaryChange = (index: number, value: string) => {
+    const newSummary = [...(analysisData.detailedSummary || ["", "", ""])];
+    newSummary[index] = value;
+    setAnalysisData({ ...analysisData, detailedSummary: newSummary });
+  };
+
   if (!isOpen) return null;
 
   const handleAnalyze = async () => {
@@ -111,7 +117,6 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
 
     try {
       const result = await analyzeNewsArticle(url, manualText);
-      // 🌟 AI 분석 결과에 현재 사용자 이름을 기본 작성자로 추가
       setAnalysisData({
         ...result,
         author: auth.currentUser?.displayName || ""
@@ -276,7 +281,6 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 </div>
               </div>
 
-              {/* 🌟 [추가] 작성자 및 카테고리 입력 영역 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="text-xs font-bold text-gray-500 uppercase">작성자</label>
@@ -289,24 +293,21 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 </div>
                 <div>
                    <label className="text-xs font-bold text-gray-500 uppercase">카테고리</label>
-                
-                   // [수정] select 태그 부분에서 카테고리 정보를 가져오는 방식 변경
                    <select 
                      value={analysisData.category}
                      onChange={(e) => setAnalysisData({...analysisData, category: e.target.value})}
                      className="w-full mt-1 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md text-sm cursor-pointer"
                    >
-                     {/* NEWS_CATEGORIES 객체를 기반으로 옵션 생성 */}
                      {Object.values(NEWS_CATEGORIES).map((cat) => (
                        <option key={cat.id} value={cat.id}>
                          {cat.icon} {cat.name}
                        </option>
                      ))}
                    </select>
-
                 </div>
               </div>
 
+              {/* 🌟 1. 한 줄 핵심 요약 (목록 노출용) */}
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
                 <label className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase flex items-center gap-1">
                   ✨ 한 줄 핵심 요약
@@ -314,18 +315,42 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 <textarea
                   value={analysisData.shortSummary}
                   onChange={(e) => setAnalysisData({...analysisData, shortSummary: e.target.value})}
-                  className="w-full mt-2 bg-transparent border-none p-0 text-gray-800 dark:text-gray-200 font-medium focus:ring-0 resize-none"
+                  className="w-full mt-2 bg-transparent border-none p-0 text-gray-800 dark:text-gray-200 font-medium focus:ring-0 resize-none text-sm"
                   rows={2}
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">💡 에듀테크/산업 인사이트</label>
+              {/* 🌟 2. 상세 핵심 요약 (상세 페이지의 3문장 불렛포인트 연동) */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                  📝 핵심 요약 (상세 페이지 노출)
+                </label>
+                <div className="space-y-2">
+                  {(analysisData.detailedSummary || ["", "", ""]).map((item: string, idx: number) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                      <span className="text-indigo-500 mt-2.5 text-xs">•</span>
+                      <textarea
+                        value={item}
+                        onChange={(e) => handleDetailedSummaryChange(idx, e.target.value)}
+                        placeholder={`요약 문장 ${idx + 1}`}
+                        className="w-full p-2.5 bg-gray-50 dark:bg-zinc-800 rounded-lg text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 outline-none border-none"
+                        rows={2}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 🌟 3. 에듀테크 인사이트 (디자인 상세 화면과 통일) */}
+              <div className="bg-blue-50/50 dark:bg-zinc-800/50 p-5 rounded-xl border border-blue-100 dark:border-zinc-800">
+                <label className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase flex items-center gap-1 mb-2">
+                  💡 에듀테크 INSIGHT
+                </label>
                 <textarea
                   value={analysisData.insight}
                   onChange={(e) => setAnalysisData({...analysisData, insight: e.target.value})}
-                  className="w-full mt-2 p-3 bg-gray-50 dark:bg-zinc-800 rounded-xl text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 outline-none"
-                  rows={3}
+                  className="w-full bg-transparent border-none p-0 text-gray-800 dark:text-gray-200 text-sm leading-relaxed focus:ring-0"
+                  rows={4}
                 />
               </div>
 

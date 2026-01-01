@@ -65,7 +65,7 @@ function MainContent() {
         {/* 사이드바 */}
         <Sidebar 
           activeMenu={activeMenu} 
-          onMenuChange={handleMenuChange} 
+          onMenuChange={handleMenuChange} // 🌟 handleMenuChange로 교체
           isCollapsed={sidebarCollapsed}
           onCollapseChange={setSidebarCollapsed}
         />
@@ -77,13 +77,13 @@ function MainContent() {
             <LoginButton />
           </div>
 
-          {/* 🛠️ [수정] pt-6을 제거하여 각 탭이 대시보드와 동일한 상단 여백(p-6)을 가지게 함 */}
-          <main className="pb-20">
+          {/* 컨텐츠 */}
+          <main className="pb-20 pt-6">
             <Suspense fallback={<div className="text-center py-20">로딩 중...</div>}>
               {renderContent()}
             </Suspense>
           </main>
-        </div>  
+        </div>
       </div>
     </>
   );

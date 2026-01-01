@@ -53,6 +53,7 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
     // 4. 프롬프트 작성
     const prompt = `
     다음 뉴스 기사를 분석하고 JSON 포맷으로 요약해줘.
+    오늘 날짜는 ${new Date().toISOString().split('T')[0]}이야. 기사 내용에 날짜가 없다면 오늘 날짜를 참고해.
     
     [기사 정보]
     - URL: ${url}
@@ -63,7 +64,7 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
     1. shortSummary: 뉴스 목록 카드에 들어갈 50자 이내의 아주 핵심적인 한 줄 요약 (한국어).
     2. detailedSummary: 상세 요약 문장 3개 배열 (한국어).
     3. insight: 이 뉴스가 '에듀테크'나 'AI 산업'에 미치는 영향이나 시사점 (150자 이내, 한국어).
-    4. category: 다음 중 가장 적절한 ID 선택 (EDUTECH_AI, AI_TECH, AI_TOOLS, INDUSTRY_TREND, COMPANY_NEWS, POLICY_ETHICS, RESEARCH, PRODUCT_RELEASE).
+    4. category: 다음 중 가장 적절한 ID 선택 (EDUTECH_AI, AI_TECH, AI_SERVICE, TREND, INVESTMENT, POLICY, RESEARCH, NEW_PRODUCT).
     5. tags: 관련 해시태그 3~5개.
     6. 영어 기사라도 제목 및 내용은 모두 한국어로 번역해서 작성할 것.
 
