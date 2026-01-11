@@ -5,25 +5,55 @@ import * as cheerio from "cheerio";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// 🌟 [수정] manualText 인자를 선택적(optional)으로 추가
+/**
+ * 🌟 구글 뉴스 암호화 주소(CBMi...)를 즉시 해독하는 함수
+ * 스크린샷에서 발생한 search() 문법 오류를 해결하고 정밀하게 추출합니다.
+ */
+function resolveGoogleUrl(url: string): string {
+  if (!url || !url.includes("news.google.com")) return url;
+
+  try {
+    const parts = url.split("/");
+    const encodedData = parts[parts.length - 1]?.split("?")[0];
+    
+    if (encodedData) {
+      const buffer = Buffer.from(encodedData, "base64");
+      const decoded = buffer.toString("binary");
+      
+      const start = decoded.indexOf("http");
+      if (start !== -1) {
+        // search()는 인자를 하나만 받으므로 자른 후 검색함
+        const suffix = decoded.substring(start);
+        const endOfUrl = suffix.search(/[^\x20-\x7E]/);
+        const actualUrl = endOfUrl !== -1 ? suffix.substring(0, endOfUrl) : suffix;
+        
+        console.log("🎯 구글 주소 해독 성공 -> 원문 접속:", actualUrl);
+        return actualUrl;
+      }
+    }
+  } catch (e) {
+    console.error("구글 URL 해독 실패:", e);
+  }
+  return url;
+}
+
 export async function analyzeNewsArticle(url: string, manualText?: string) {
-  console.log("🔍 분석 시작 URL:", url, manualText ? "(본문 직접 입력됨)" : "");
+  console.log("🔍 분석 시작 URL:", url);
 
   try {
     let bodyText = "";
     let title = "";
+    
+    // 1. 🌟 구글 주소를 진짜 언론사 주소로 즉시 변환
+    const targetUrl = resolveGoogleUrl(url);
 
-    // 1. 수동 입력 텍스트가 있는 경우 크롤링을 건너뛰고 바로 사용
     if (manualText && manualText.trim().length > 0) {
       bodyText = manualText.trim().slice(0, 15000);
-      title = "직접 입력된 콘텐츠"; // 분석 전 임시 제목
-      console.log("✅ 수동 입력 본문 사용 (길이):", bodyText.length);
-    } 
-    // 2. 수동 입력이 없는 경우 기존 방식대로 URL에서 HTML 가져오기
-    else {
-      const response = await fetch(url, {
+      title = "직접 입력된 콘텐츠";
+    } else {
+      const response = await fetch(targetUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
       });
       
@@ -31,32 +61,33 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
       
       const html = await response.text();
       const $ = cheerio.load(html);
-      
-      $("script, style, nav, footer, header, aside, iframe").remove();
+      $("script, style, nav, footer, header, aside, iframe, noscript").remove();
       
       title = $("title").text().trim() || $("meta[property='og:title']").attr("content") || "";
       
-      bodyText = $("article").text() || $("#content").text() || $(".article_view").text() || $("main").text() || $("body").text();
-      bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
+      bodyText = $("article").text() || $("#content").text() || $(".article_view").text() || $(".article-body").text() || $("main").text() || "";
 
+      if (bodyText.replace(/\s+/g, " ").trim().length < 100) {
+        bodyText = $("p").map((i, el) => $(el).text()).get().join(" ");
+      }
+
+      bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
       console.log("✅ 본문 추출 완료 (길이):", bodyText.length);
 
-      if (bodyText.length < 50) throw new Error("본문 내용을 추출할 수 없습니다.");
+      if (bodyText.length < 50) throw new Error("본문을 읽어올 수 없습니다.");
     }
 
-    // 3. Gemini 모델 설정
     const model = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash-exp", 
         generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 4. 프롬프트 작성
     const prompt = `
     다음 뉴스 기사를 분석하고 JSON 포맷으로 요약해줘.
-    오늘 날짜는 ${new Date().toISOString().split('T')[0]}이야. 기사 내용에 날짜가 없다면 오늘 날짜를 참고해.
+    오늘 날짜는 ${new Date().toISOString().split('T')[0]}이야.
     
     [기사 정보]
-    - URL: ${url}
+    - URL: ${targetUrl}
     - 제목: ${title}
     - 본문 내용: ${bodyText}
 
@@ -70,7 +101,7 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
 
     [출력 JSON 형식]
     {
-      "title": "${title}", 
+      "title": "${title.replace(/"/g, "'")}", 
       "source": "언론사명",
       "date": "YYYY-MM-DD",
       "shortSummary": "한 줄 요약",
@@ -83,43 +114,26 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
 
     const result = await model.generateContent(prompt);
     let text = result.response.text();
-    
-    console.log("🤖 Gemini RAW Response for Debugging:", text); 
-
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
     try {
         let parsedData = JSON.parse(text);
-
-        if (Array.isArray(parsedData)) {
-            console.log("⚠️ 배열 형태로 반환됨, 첫 번째 요소 추출");
-            parsedData = parsedData[0];
-        }
-
-        console.log("✅ Parsed Data Success:", parsedData); 
-
-        if (!parsedData.title || !parsedData.shortSummary || parsedData.detailedSummary?.length === 0) {
-             throw new Error("AI 분석 결과에 필수 필드(제목, 요약)가 누락되었거나 내용이 비어있습니다.");
-        }
+        if (Array.isArray(parsedData)) parsedData = parsedData[0];
         
-        return parsedData;
-
+        // 🌟 해독된 진짜 URL을 결과에 포함시켜 반환
+        return { ...parsedData, resolvedUrl: targetUrl };
     } catch (e) {
-        console.error("❌ JSON Parsing Failed:", e);
-        throw new Error(`AI 분석 결과 형식이 잘못되었습니다. (JSON Parsing Error): ${e}`);
+        throw new Error("AI 분석 결과 형식이 잘못되었습니다.");
     }
 
   } catch (error: any) {
-    console.error("❌ News Analysis Error:", error);
-    throw new Error(error.message || "뉴스 분석 중 오류가 발생했습니다.");
+    console.error("❌ 최종 분석 실패:", error);
+    throw new Error(error.message || "뉴스 분석 과정에서 오류가 발생했습니다.");
   }
 }
 
-// 🌟 [유지] 대시보드 헤드라인 생성용 함수 (변경 없음)
 export async function generateTrendHeadline(newsList: { title: string; summary: string }[]) {
-  if (!newsList || newsList.length === 0) {
-    return { headline: "현재 분석할 뉴스가 충분하지 않습니다." };
-  }
+  if (!newsList || newsList.length === 0) return { headline: "현재 분석할 뉴스가 충분하지 않습니다." };
 
   try {
     const model = genAI.getGenerativeModel({
@@ -127,9 +141,7 @@ export async function generateTrendHeadline(newsList: { title: string; summary: 
       generationConfig: { responseMimeType: "application/json" },
     });
 
-    const combinedText = newsList
-      .map((n, i) => `${i + 1}. ${n.title} (${n.summary})`)
-      .join("\n");
+    const combinedText = newsList.map((n, i) => `${i + 1}. ${n.title} (${n.summary})`).join("\n");
 
     const prompt = `
       너는 'AI 트렌드 헤드라인 작가'야.
@@ -143,7 +155,7 @@ export async function generateTrendHeadline(newsList: { title: string; summary: 
       4. 특정 기업이나 모델이 반복되면 그걸 메인으로 잡고, 아니면 전반적인 흐름을 요약해.
 
       [입력 데이터]
-      ${combinedText}
+      \${combinedText}
 
       [출력 JSON]
       { "headline": "여기에 헤드라인 작성" }
@@ -153,7 +165,6 @@ export async function generateTrendHeadline(newsList: { title: string; summary: 
     const text = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(text);
   } catch (error) {
-    console.error("Headline Generation Error:", error);
     return { headline: "AI 트렌드 분석 중..." };
   }
 }

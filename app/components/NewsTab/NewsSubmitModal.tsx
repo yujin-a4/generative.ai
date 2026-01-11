@@ -6,7 +6,21 @@ import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
 import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService";
 import { auth } from "@/lib/firebase";
 
-const SITE_GROUPS = [
+// 🌟 TypeScript 오류 방지를 위한 타입 정의
+interface Site {
+  name: string;
+  url: string;
+  desc: string;
+  color?: string;
+}
+
+interface SiteGroup {
+  title: string;
+  color: string;
+  sites: Site[];
+}
+
+const SITE_GROUPS: SiteGroup[] = [
   {
     title: "🇰🇷 국내 AI/IT 핵심",
     color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300",
@@ -68,6 +82,10 @@ interface NewsSubmitModalProps {
 
 export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSubmitModalProps) {
   const [step, setStep] = useState<"INPUT" | "ANALYZING" | "REVIEW">("INPUT");
+  const [activeTab, setActiveTab] = useState<"manual" | "feed">("manual");
+  const [autoNews, setAutoNews] = useState<any[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+
   const [url, setUrl] = useState("");
   const [manualText, setManualText] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
@@ -93,30 +111,48 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
       });
     } else if (isOpen && !initialData) {
       setStep("INPUT");
+      setActiveTab("manual");
       setUrl("");
       setManualText("");
       setShowManualInput(false);
       setAnalysisData(null);
       setError("");
+      loadTrendingNews();
     }
   }, [isOpen, initialData]);
 
-  // 🌟 [추가] 상세 요약(detailedSummary)의 특정 인덱스를 수정하는 핸들러
+  const loadTrendingNews = async () => {
+    setIsLoadingFeed(true);
+    try {
+      const response = await fetch('/api/news');
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      const news = await response.json();
+      setAutoNews(news);
+    } catch (err) {
+      console.error("뉴스 로드 중 오류:", err);
+      setError("최신 뉴스를 가져오는 데 실패했습니다.");
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
+
   const handleDetailedSummaryChange = (index: number, value: string) => {
     const newSummary = [...(analysisData.detailedSummary || ["", "", ""])];
     newSummary[index] = value;
     setAnalysisData({ ...analysisData, detailedSummary: newSummary });
   };
 
-  if (!isOpen) return null;
-
-  const handleAnalyze = async () => {
-    if (!url && !manualText) return;
+  const handleAnalyze = async (overrideUrl?: string) => {
+    const targetUrl = overrideUrl || url;
+    if (!targetUrl && !manualText) return;
     setStep("ANALYZING");
-    setError("");
-
+  
     try {
-      const result = await analyzeNewsArticle(url, manualText);
+      const result = await analyzeNewsArticle(targetUrl, manualText);
+      
+      if (result.resolvedUrl) setUrl(result.resolvedUrl);
+  
       setAnalysisData({
         ...result,
         author: auth.currentUser?.displayName || ""
@@ -126,6 +162,7 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
       setError("해당 링크의 내용을 가져오는 데 실패했습니다. 아래에 본문 내용을 직접 붙여넣어 주세요.");
       setShowManualInput(true);
       setStep("INPUT");
+      setActiveTab("manual");
     }
   };
 
@@ -150,6 +187,8 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -159,86 +198,149 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
             {step === "REVIEW" 
               ? (initialData ? "📝 뉴스 수정하기" : "📝 분석 결과 확인") 
-              : "📰 뉴스 링크 추가"}
+              : "📰 뉴스 추가하기"}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
             ✕
           </button>
         </div>
 
+        {/* 탭 메뉴 */}
+        {step === "INPUT" && !initialData && (
+          <div className="flex border-b border-gray-100 dark:border-zinc-800 px-6 bg-white dark:bg-zinc-900">
+            <button 
+              onClick={() => setActiveTab("manual")}
+              className={`py-3 px-4 text-sm font-bold transition-all ${activeTab === "manual" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-gray-400 hover:text-gray-600"}`}
+            >
+              직접 입력
+            </button>
+            <button 
+              onClick={() => setActiveTab("feed")}
+              className={`py-3 px-4 text-sm font-bold transition-all ${activeTab === "feed" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-gray-400 hover:text-gray-600"}`}
+            >
+              최신 뉴스 모아보기
+              {autoNews.length > 0 && <span className="ml-2 bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full text-[10px]">{autoNews.length}</span>}
+            </button>
+          </div>
+        )}
+
         {/* 컨텐츠 */}
         <div className="p-6 overflow-y-auto custom-scrollbar">
           
           {step === "INPUT" && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  뉴스 기사 URL
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/article..."
-                  className="w-full p-4 border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                />
-
-                {showManualInput && (
-                  <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2">
-                      ⚠️ 본문 직접 입력
+              {activeTab === "manual" ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      뉴스 기사 URL
                     </label>
-                    <textarea
-                      placeholder="분석하고 싶은 웹사이트의 본문 내용을 여기에 복사해서 붙여넣으세요."
-                      className="w-full p-4 border border-red-200 dark:border-red-900/30 rounded-xl bg-red-50/30 dark:bg-red-900/10 focus:ring-2 focus:ring-red-500 outline-none text-sm"
-                      rows={6}
-                      value={manualText}
-                      onChange={(e) => setManualText(e.target.value)}
+                    <input
+                      type="url"
+                      placeholder="https://example.com/article..."
+                      className="w-full p-4 border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
                     />
-                  </div>
-                )}
-                
-                {!showManualInput && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
-                      💡 어디에서 뉴스를 찾나요? 추천 사이트를 확인해 보세요.
-                    </h4>
 
-                    <div className="space-y-3 p-1">
-                      {SITE_GROUPS.map((group) => (
-                        <div key={group.title}>
-                          <h5 className="text-[10px] font-bold text-gray-400 mb-1.5 ml-1">{group.title}</h5>
-                          <div className="grid grid-cols-3 gap-2">
-                            {group.sites.map((site: any) => (
-                              <a 
-                                key={site.name}
-                                href={site.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`flex flex-col px-2 py-2 rounded-lg border border-transparent hover:border-black/5 hover:shadow-sm transition-all text-center ${site.color || group.color}`}
-                              >
-                                <span className="text-xs font-bold block mb-0.5 truncate">{site.name}</span>
-                                <span className="text-[9px] opacity-70 truncate block">{site.desc}</span>
-                              </a>
-                            ))}
+                    {showManualInput && (
+                      <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+                          ⚠️ 본문 직접 입력
+                        </label>
+                        <textarea
+                          placeholder="본문 내용을 여기에 붙여넣으세요."
+                          className="w-full p-4 border border-red-200 dark:border-red-900/30 rounded-xl bg-red-50/30 dark:bg-red-900/10 focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                          rows={6}
+                          value={manualText}
+                          onChange={(e) => setManualText(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    
+                    {!showManualInput && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
+                          💡 어디에서 뉴스를 찾나요? 아래 추천 사이트를 확인해 보세요.
+                        </h4>
+                        <div className="space-y-3 p-1">
+                          {SITE_GROUPS.map((group) => (
+                            <div key={group.title}>
+                              <h5 className="text-[10px] font-bold text-gray-400 mb-1.5 ml-1">{group.title}</h5>
+                              <div className="grid grid-cols-3 gap-2">
+                                {group.sites.map((site: Site) => (
+                                  <a 
+                                    key={site.name}
+                                    href={site.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`flex flex-col px-2 py-2 rounded-lg border border-transparent hover:border-black/5 hover:shadow-sm transition-all text-center ${site.color || group.color}`}
+                                  >
+                                    <span className="text-xs font-bold block mb-0.5 truncate">{site.name}</span>
+                                    <span className="text-[9px] opacity-70 truncate block">{site.desc}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {error && <p className="text-red-500 text-sm">⚠️ {error}</p>}
+                  <button
+                    onClick={() => handleAnalyze()}
+                    disabled={!url && !manualText}
+                    className={`w-full py-4 rounded-xl font-bold text-lg transition-colors ${
+                      showManualInput ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
+                    } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {showManualInput ? "본문 내용으로 다시 분석하기 ✨" : "Gemini로 분석 시작 ✨"}
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  {/* --- 🌟 안내 문구 추가 --- */}
+                  <div className="bg-indigo-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                    <p className="text-sm text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                      실시간으로 수집된 최신 AI 뉴스를 확인해 보세요! 📰<br/>
+                      공유하고 싶은 유익한 기사를 발견하셨다면, 링크(URL)를 복사해 '직접 입력' 탭에서 분석 및 등록하실 수 있습니다. ✨
+                    </p>
+                  </div>
+
+                  {isLoadingFeed ? (
+                    <div className="py-20 text-center">
+                      <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-500 text-sm">최신 AI 뉴스를 수집 중입니다...</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                      {autoNews.map((news, idx) => (
+                        <div key={idx} className="py-4 first:pt-0 group">
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex-1">
+                              <span className="text-[10px] font-bold text-indigo-500 uppercase">{news.source}</span>
+                              <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-1 leading-snug group-hover:text-indigo-600 transition-colors">
+                                {news.title}
+                              </h4>
+                              <p className="text-[11px] text-gray-400 mt-1">{new Date(news.pubDate).toLocaleDateString()}</p>
+                            </div>
+                            {/* --- 🌟 게시하기 버튼 삭제, 원문 보기만 유지 --- */}
+                            <a 
+                              href={news.link} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-lg hover:bg-gray-200 transition-colors shrink-0"
+                            >
+                              원문 보기
+                            </a>
                           </div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-              </div>
-              {error && <p className="text-red-500 text-sm">⚠️ {error}</p>}
-              <button
-                onClick={handleAnalyze}
-                disabled={!url && !manualText}
-                className={`w-full py-4 rounded-xl font-bold text-lg transition-colors ${
-                  showManualInput ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
-                } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {showManualInput ? "본문 내용으로 다시 분석하기 ✨" : "Gemini로 분석 시작 ✨"}
-              </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -260,7 +362,7 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                   className="w-full mt-1 p-2 bg-transparent border-b border-gray-200 dark:border-zinc-700 font-bold text-lg focus:border-indigo-500 outline-none"
                 />
               </div>
-
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="text-xs font-bold text-gray-500 uppercase">기사 날짜</label>
@@ -288,7 +390,6 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                      value={analysisData.author || ""} 
                      onChange={(e) => setAnalysisData({...analysisData, author: e.target.value})}
                      className="w-full mt-1 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md text-sm font-medium"
-                     placeholder="작성자 이름"
                    />
                 </div>
                 <div>
@@ -307,11 +408,8 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 </div>
               </div>
 
-              {/* 🌟 1. 한 줄 핵심 요약 (목록 노출용) */}
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/50">
-                <label className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase flex items-center gap-1">
-                  ✨ 한 줄 핵심 요약
-                </label>
+                <label className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase">✨ 한 줄 핵심 요약</label>
                 <textarea
                   value={analysisData.shortSummary}
                   onChange={(e) => setAnalysisData({...analysisData, shortSummary: e.target.value})}
@@ -320,11 +418,8 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 />
               </div>
 
-              {/* 🌟 2. 상세 핵심 요약 (상세 페이지의 3문장 불렛포인트 연동) */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
-                  📝 핵심 요약 (상세 페이지 노출)
-                </label>
+                <label className="text-xs font-bold text-gray-500 uppercase">📝 핵심 요약</label>
                 <div className="space-y-2">
                   {(analysisData.detailedSummary || ["", "", ""]).map((item: string, idx: number) => (
                     <div key={idx} className="flex gap-2 items-start">
@@ -332,8 +427,7 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                       <textarea
                         value={item}
                         onChange={(e) => handleDetailedSummaryChange(idx, e.target.value)}
-                        placeholder={`요약 문장 ${idx + 1}`}
-                        className="w-full p-2.5 bg-gray-50 dark:bg-zinc-800 rounded-lg text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 outline-none border-none"
+                        className="w-full p-2.5 bg-gray-50 dark:bg-zinc-800 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none border-none"
                         rows={2}
                       />
                     </div>
@@ -341,11 +435,8 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 </div>
               </div>
 
-              {/* 🌟 3. 에듀테크 인사이트 (디자인 상세 화면과 통일) */}
               <div className="bg-blue-50/50 dark:bg-zinc-800/50 p-5 rounded-xl border border-blue-100 dark:border-zinc-800">
-                <label className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase flex items-center gap-1 mb-2">
-                  💡 에듀테크 INSIGHT
-                </label>
+                <label className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-2 block">💡 에듀테크 INSIGHT</label>
                 <textarea
                   value={analysisData.insight}
                   onChange={(e) => setAnalysisData({...analysisData, insight: e.target.value})}
@@ -354,21 +445,10 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
                 />
               </div>
 
-              <div>
-                 <label className="text-xs font-bold text-gray-500 uppercase">해시태그</label>
-                 <div className="flex flex-wrap gap-2 mt-2">
-                   {analysisData.tags?.map((tag: string, i: number) => (
-                     <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-zinc-700 rounded text-xs text-gray-600 dark:text-gray-300">
-                       {tag}
-                     </span>
-                   ))}
-                 </div>
-              </div>
-
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 disabled:opacity-50"
               >
                 {isSubmitting ? "처리 중..." : (initialData ? "수정 완료" : "게시하기")}
               </button>
