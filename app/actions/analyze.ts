@@ -43,9 +43,9 @@ async function analyzeWithGemini(combinedText: string, reportType: string): Prom
 
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // ⚡ gemini-2.0-flash-exp (속도/성능 최적화)
+  // ⚡ gemini-2.5-flash (속도/성능 최적화)
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.5-flash',
     generationConfig: { responseMimeType: "application/json", maxOutputTokens: 40000 } 
   });
 

@@ -78,7 +78,7 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
     }
 
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash-exp", 
+        model: "gemini-2.5-flash", 
         generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -137,7 +137,7 @@ export async function generateTrendHeadline(newsList: { title: string; summary: 
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: { responseMimeType: "application/json" },
     });
 
