@@ -289,6 +289,85 @@ function MetricChartCard({
   );
 }
 
+// ─── 제조사 종합 순위 계산 (STT — Best AA-WER 기준) ──────────────────
+function calculateSTTManufacturerRanking(totalRanking: any[]): any[] {
+  const orgMap: Record<string, { bestWER: number; bestModel: string; count: number }> = {};
+  totalRanking.forEach((item: any) => {
+    const org = item.org || 'Others';
+    const wer = Number(item.score);
+    if (isNaN(wer)) return;
+    if (!orgMap[org]) orgMap[org] = { bestWER: wer, bestModel: item.model, count: 0 };
+    orgMap[org].count++;
+    if (wer < orgMap[org].bestWER) { orgMap[org].bestWER = wer; orgMap[org].bestModel = item.model; }
+  });
+  return Object.entries(orgMap)
+    .map(([org, s]) => ({ org, bestWER: s.bestWER, bestModel: s.bestModel, count: s.count }))
+    .sort((a, b) => a.bestWER - b.bestWER)
+    .slice(0, 5)
+    .map((item, idx) => ({ rank: idx + 1, ...item }));
+}
+
+// ─── STT 제조사 순위 테이블 ──────────────────────────────────────────
+function STTManufacturerTable({ items }: { items: any[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-[2rem] shadow-lg border border-slate-100 overflow-hidden mb-16">
+      <div className="p-8 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white">
+        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+          <span className="text-3xl bg-white p-2 rounded-xl shadow-sm">🏢</span>
+          제조사 종합 순위
+        </h2>
+        <p className="text-sm text-slate-500 mt-1 ml-14">
+          각 제조사 최고 모델 AA-WER 기준 — 어느 회사가 가장 정확한 STT를 만드는가? (낮을수록 우수)
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-emerald-50 border-b border-emerald-100 text-slate-700">
+              <th className="py-4 px-6 font-bold text-sm text-center w-20">순위</th>
+              <th className="py-4 px-6 font-bold text-sm">제조사</th>
+              <th className="py-4 px-6 font-bold text-sm text-slate-500">대표 모델 (Best WER)</th>
+              <th className="py-4 px-6 font-bold text-sm text-center text-slate-400">참여 모델</th>
+              <th className="py-4 px-6 font-bold text-sm text-right text-emerald-600">🎯 Best AA-WER ↓</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item: any, idx: number) => {
+              const org = getOrgColor(item.org);
+              return (
+                <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                  <td className="py-4 px-6 text-center">
+                    {idx === 0 ? <span className="text-4xl drop-shadow-md">🥇</span>
+                      : idx === 1 ? <span className="text-4xl drop-shadow-md">🥈</span>
+                      : idx === 2 ? <span className="text-4xl drop-shadow-md">🥉</span>
+                      : <span className="text-xl font-black text-slate-400">{idx + 1}</span>}
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: org.color }} />
+                      <span className="font-bold text-slate-700 text-lg">{org.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-sm text-slate-500 max-w-[220px] truncate">{item.bestModel}</td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                      {item.count}개
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-right font-black text-emerald-600 text-xl">
+                    {Number(item.bestWER).toFixed(1)}%
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── 제조사 범례 ───────────────────────────────────────────────
 function OrgLegend({ items }: { items: any[] }) {
   if (!items?.length) return null;
@@ -322,6 +401,7 @@ export default function ReportViewSTT({ data, onSave, onReanalyze, isSaving, isE
 
   const { raw_data, summary_insights, report_type, data_dates } = reportData;
   const totalRanking: any[] = raw_data?.test_benchmarks?.total_ranking || [];
+  const mfrRanking = calculateSTTManufacturerRanking(totalRanking);
   const speedItems: any[]  = raw_data?.test_benchmarks?.sub_categories?.speed?.items  || [];
   const priceItems: any[]  = raw_data?.test_benchmarks?.sub_categories?.price?.items  || [];
   const speedComment = raw_data?.test_benchmarks?.sub_categories?.speed?.comment  || "";
@@ -382,6 +462,9 @@ export default function ReportViewSTT({ data, onSave, onReanalyze, isSaving, isE
       </header>
 
       <div className="max-w-5xl mx-auto px-6 pt-12">
+
+        {/* ── Section 0: 제조사 종합 순위 ── */}
+        {mfrRanking.length > 0 && <STTManufacturerTable items={mfrRanking} />}
 
         {/* ── Section 1: 정확도 순위 (AA-WER) ── */}
         {totalRanking.length > 0 && (

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: class 기반 다크모드 활성화 */
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -7,11 +10,9 @@
   --font-mono: var(--font-geist-mono); /* 👈 [복원] 폰트 변수 정의 */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {

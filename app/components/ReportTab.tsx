@@ -173,37 +173,62 @@ export default function ReportTab() {
                       <span>📅 {formatDate(report.created_at)}</span>
                     </div>
                     
-        {/* 🛠️ [수정] 줄글 요약 대신 TOP 3 순위 리스트 표시 */}
-        <div className="space-y-2.5 mb-8 flex-1">
-          {report.analysis_result?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 3).map((item: any, idx: number) => (
-            <div 
-              key={idx} 
-              className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800 group-hover:border-indigo-100 dark:group-hover:border-indigo-900/30 transition-colors"
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                {/* 순위 배지 */}
-                <span className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[11px] font-black shadow-sm ${
-                  idx === 0 ? "bg-yellow-400 text-white" :
-                  idx === 1 ? "bg-slate-300 text-gray-700" :
-                  "bg-orange-300 text-white"
-                }`}>
-                  {idx + 1}
-                </span>
-                {/* 모델명 (말줄임 처리) */}
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">
-                  {item.model.split('/').pop()?.replace(/-/g, ' ')}
-                </span>
-              </div>
-              {/* 점수 또는 등급 */}
-              <span className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md">
-                {item.score || item.elo || "TOP"}
-              </span>
+        {/* TOP 3 순위 리스트 — test_benchmarks 또는 vote_rankings.overall 둘 다 지원 */}
+        {(() => {
+          const reportType = (report.analysis_result?.report_type || "").toUpperCase();
+          // TTS: vote_rankings.overall (Elo)
+          // STT: test_benchmarks.total_ranking (WER)
+          // 그 외: test_benchmarks.total_ranking
+          const isTTS = reportType === "TTS";
+          const isSTT = reportType === "STT";
+
+          const topItems: any[] = isTTS
+            ? (report.analysis_result?.raw_data?.vote_rankings?.overall?.slice(0, 3) || [])
+            : (report.analysis_result?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 3) || []);
+
+          if (topItems.length === 0) {
+            return <p className="text-sm text-gray-400 italic text-center py-4 flex-1">순위 정보를 불러오는 중...</p>;
+          }
+
+          return (
+            <div className="space-y-2.5 mb-8 flex-1">
+              {topItems.map((item: any, idx: number) => {
+                const scoreVal = isTTS
+                  ? (item.elo ?? item.score ?? "")
+                  : (item.score ?? item.elo ?? "");
+                const displayScore = scoreVal !== "" && scoreVal !== null
+                  ? (isSTT ? `${Number(scoreVal).toFixed(1)}%` : `${Number(scoreVal).toLocaleString()}`)
+                  : "TOP";
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800/50 p-2.5 rounded-xl border border-gray-100 dark:border-zinc-800 group-hover:border-indigo-100 dark:group-hover:border-indigo-900/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <span className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[11px] font-black shadow-sm ${
+                        idx === 0 ? "bg-yellow-400 text-white" :
+                        idx === 1 ? "bg-slate-300 text-gray-700" :
+                        "bg-orange-300 text-white"
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">
+                        {item.model?.split('/').pop()?.replace(/-/g, ' ')}
+                      </span>
+                    </div>
+                    <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                      isTTS ? "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30"
+                      : isSTT ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30"
+                      : "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30"
+                    }`}>
+                      {displayScore}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          )) || (
-            // 데이터가 없는 경우 폴백 메시지
-            <p className="text-sm text-gray-400 italic text-center py-4">순위 정보를 불러오는 중...</p>
-          )}
-        </div>
+          );
+        })()}
         
         <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-bold text-sm group-hover:translate-x-1 transition-transform">
           상세 리포트 보기 <span className="ml-1">→</span>
@@ -218,7 +243,7 @@ export default function ReportTab() {
             <p className="text-gray-500 mb-4">
               아직 등록된 <strong>{currentCatInfo?.label}</strong> 리포트가 없습니다.
             </p>
-            <Link href="/admin" className="text-indigo-600 font-bold hover:underline">
+            <Link href="/admin" target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold hover:underline">
               관리자 페이지에서 만들기
             </Link>
           </div>

@@ -78,6 +78,85 @@ function OrgLegend({ items }: { items: any[] }) {
   );
 }
 
+// ─── 제조사 종합 순위 계산 (Best Elo 기준) ──────────────────────
+function calculateTTSManufacturerRanking(overall: any[]): any[] {
+  const orgMap: Record<string, { bestElo: number; bestModel: string; count: number }> = {};
+  overall.forEach((item: any) => {
+    const org = item.org || 'Others';
+    const elo = Number(item.elo || item.score) || 0;
+    if (!elo) return;
+    if (!orgMap[org]) orgMap[org] = { bestElo: elo, bestModel: item.model, count: 0 };
+    orgMap[org].count++;
+    if (elo > orgMap[org].bestElo) { orgMap[org].bestElo = elo; orgMap[org].bestModel = item.model; }
+  });
+  return Object.entries(orgMap)
+    .map(([org, s]) => ({ org, bestElo: s.bestElo, bestModel: s.bestModel, count: s.count }))
+    .sort((a, b) => b.bestElo - a.bestElo)
+    .slice(0, 5)
+    .map((item, idx) => ({ rank: idx + 1, ...item }));
+}
+
+// ─── TTS 제조사 순위 테이블 ─────────────────────────────────────
+function TTSManufacturerTable({ items }: { items: any[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-[2rem] shadow-lg border border-slate-100 overflow-hidden mb-16">
+      <div className="p-8 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-white">
+        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+          <span className="text-3xl bg-white p-2 rounded-xl shadow-sm">🏢</span>
+          제조사 종합 순위
+        </h2>
+        <p className="text-sm text-slate-500 mt-1 ml-14">
+          각 제조사 최고 모델 기준 Elo 점수 — 어느 회사가 가장 뛰어난 TTS를 만드는가?
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-violet-50 border-b border-violet-100 text-slate-700">
+              <th className="py-4 px-6 font-bold text-sm text-center w-20">순위</th>
+              <th className="py-4 px-6 font-bold text-sm">제조사</th>
+              <th className="py-4 px-6 font-bold text-sm text-slate-500">대표 모델</th>
+              <th className="py-4 px-6 font-bold text-sm text-center text-slate-400">참여 모델</th>
+              <th className="py-4 px-6 font-bold text-sm text-right text-violet-600">🏆 Best Elo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item: any, idx: number) => {
+              const org = getOrgColor(item.org);
+              return (
+                <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                  <td className="py-4 px-6 text-center">
+                    {idx === 0 ? <span className="text-4xl drop-shadow-md">🥇</span>
+                      : idx === 1 ? <span className="text-4xl drop-shadow-md">🥈</span>
+                      : idx === 2 ? <span className="text-4xl drop-shadow-md">🥉</span>
+                      : <span className="text-xl font-black text-slate-400">{idx + 1}</span>}
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: org.color }} />
+                      <span className="font-bold text-slate-700 text-lg">{org.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-sm text-slate-500 max-w-[220px] truncate">{item.bestModel}</td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-full">
+                      {item.count}개
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-right font-black text-violet-600 text-xl">
+                    {Number(item.bestElo).toLocaleString()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Top5 ELO 카드 ────────────────────────────────────────────
 function EloTop5Card({ item, idx }: { item: any; idx: number }) {
   const isFirst = idx === 0;
@@ -290,6 +369,7 @@ export default function ReportViewTTS({ data, onSave, onReanalyze, isSaving, isE
   const { raw_data, summary_insights, data_dates } = reportData;
 
   const overall      = raw_data?.vote_rankings?.overall            || [];
+  const mfrRanking   = calculateTTSManufacturerRanking(overall);
   const subCats      = raw_data?.vote_rankings?.sub_categories     || {};
   const speedItems   = subCats?.speed?.items                       || [];
   const priceItems   = subCats?.price?.items                       || [];
@@ -352,6 +432,9 @@ export default function ReportViewTTS({ data, onSave, onReanalyze, isSaving, isE
       </header>
 
       <div className="max-w-5xl mx-auto px-6 pt-12">
+
+        {/* ── Section 0: 제조사 종합 순위 ── */}
+        {mfrRanking.length > 0 && <TTSManufacturerTable items={mfrRanking} />}
 
         {/* ── Section 1: 품질 순위 (Elo) ── */}
         {overall.length > 0 && (

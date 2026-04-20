@@ -132,13 +132,17 @@ export default function ServiceTab() {
   };
 
   return (
-    // 🛠️ [수정] 패딩을 px-4 py-8로 변경
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-6 py-8">
-      {/* 🛠️ [수정] 최대 너비를 max-w-6xl로 변경 및 중앙 정렬 */}
       <div className="max-w-7xl mx-auto">
         {/* 헤더 영역 */}
-        <div className="mb-6">
+        <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI 서비스</h1>
+          <button
+            onClick={handleAddClick}
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-bold shadow-md hover:shadow-xl transition-all flex items-center gap-2 text-sm"
+          >
+            + 서비스 추가하기
+          </button>
         </div>
 
         {/* 카테고리 필터 */}
@@ -253,17 +257,6 @@ export default function ServiceTab() {
             </p>
           </div>
         )}
-
-        <button
-          onClick={handleAddClick} 
-          className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center text-2xl font-bold transition-all z-50 transform hover:scale-105"
-          aria-label="서비스 등록"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
 
         <SubmitServiceModal
           isOpen={isModalOpen}

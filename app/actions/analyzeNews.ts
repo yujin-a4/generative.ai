@@ -84,6 +84,7 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
 
     const prompt = `
     다음 뉴스 기사를 분석하고 JSON 포맷으로 요약해줘.
+    이 뉴스 사이트는 교육 출판사 직원들이 사용하는 AI 트렌드 모니터링 플랫폼이야.
     오늘 날짜는 ${new Date().toISOString().split('T')[0]}이야.
     
     [기사 정보]
@@ -92,25 +93,40 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
     - 본문 내용: ${bodyText}
 
     [필수 요청 사항]
-    1. shortSummary: 뉴스 목록 카드에 들어갈 50자 이내의 아주 핵심적인 한 줄 요약 (한국어).
+    1. shortSummary: 뉴스 목록 카드에 들어갈 50자 이내의 핵심 한 줄 요약 (한국어).
     2. detailedSummary: 상세 요약 문장 3개 배열 (한국어).
-    3. insight: 이 뉴스가 '에듀테크'나 'AI 산업'에 미치는 영향이나 시사점 (150자 이내, 한국어).
-    4. category: 다음 중 가장 적절한 ID 선택 (EDUTECH_AI, AI_TECH, AI_SERVICE, TREND, INVESTMENT, POLICY, RESEARCH, NEW_PRODUCT).
-    5. tags: 관련 해시태그 3~5개.
+    3. insight: 교육 출판사 관점에서 이 뉴스의 시사점 (150자 이내, 한국어).
+    4. category: 아래 5개 카테고리 중 하나만 선택.
+    5. tags: subTags 목록에서 1~2개 반드시 포함 + 기타 관련 해시태그 2~3개, 총 3~5개.
     6. 영어 기사라도 제목 및 내용은 모두 한국어로 번역해서 작성할 것.
+
+    [카테고리 판단 기준]
+    - AI_TECH     : AI 모델 출시(GPT·Claude·Gemini 등), 연구/논문, 오픈소스, AI 에이전트, 이미지·영상·음성 AI 기술 자체
+    - AI_SERVICE  : 사용자가 직접 쓸 수 있는 AI 앱·SaaS·플랫폼(Notion AI, Copilot, Cursor 등), B2B 솔루션·API
+    - EDUTECH_AI  : AI가 교육 현장·방법론에 적용된 구체적 사례 (AI 튜터, 자동채점, 개인화학습 효과 연구)
+    - EDU_INDUSTRY: 에듀테크·출판 기업 동향, 교육 정책, 교재 시장 변화, 해외 에듀테크, 교육업계 투자·M&A
+    - POLICY      : AI 관련 법률·규제·저작권·윤리·개인정보·고용 정책 (교육 정책은 → EDU_INDUSTRY)
+
+    [subTags — 카테고리에 맞는 것 1~2개 반드시 포함]
+    AI_TECH    : #LLM/챗봇, #멀티모달, #AI에이전트, #이미지생성, #영상/음성AI
+    AI_SERVICE : #업무생산성, #콘텐츠제작, #코딩/개발, #B2B솔루션, #검색/정보
+    EDUTECH_AI : #AI튜터/코치, #디지털교재, #평가/채점AI, #교육현장사례, #맞춤학습
+    EDU_INDUSTRY: #에듀테크기업, #출판/교재시장, #해외에듀테크
+    POLICY     : #AI규제, #저작권/지재권, #AI윤리, #고용/노동, #개인정보
 
     [출력 JSON 형식]
     {
-      "title": "${title.replace(/"/g, "'")}", 
+      "title": "${title.replace(/"/g, "'")}",
       "source": "언론사명",
       "date": "YYYY-MM-DD",
       "shortSummary": "한 줄 요약",
       "detailedSummary": ["요약1", "요약2", "요약3"],
-      "insight": "인사이트",
-      "category": "EDUTECH_AI",
-      "tags": ["#태그1", "#태그2"]
+      "insight": "교육 출판사 관점 인사이트",
+      "category": "EDU_INDUSTRY",
+      "tags": ["#교육정책", "#에듀테크기업", "#AI교육"]
     }
     `;
+
 
     const result = await model.generateContent(prompt);
     let text = result.response.text();

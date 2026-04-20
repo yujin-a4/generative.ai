@@ -16,8 +16,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
+      <head>
+        {/* 깜빡임 방지: 페이지 로드 전 저장된 테마 즉시 적용 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var saved = localStorage.getItem('theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var dark = saved ? saved === 'dark' : prefersDark;
+                if (dark) document.documentElement.classList.add('dark');
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className} flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-white`}>
+
         
         <QueryProvider>
           {/* 메인 컨텐츠 영역 */}

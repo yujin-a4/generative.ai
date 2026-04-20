@@ -8,11 +8,14 @@ import LoginButton from "@/app/components/LoginButton";
 import Sidebar, { MenuType } from "@/app/components/Sidebar";
 import Dashboard from "@/app/components/Dashboard";
 import LandingScreen from "@/app/components/LandingScreen";
+import ThemeToggle from "@/app/components/ThemeToggle";
+import FeedbackModal from "@/app/components/FeedbackModal";
 
 function MainContent() {
   const [showLanding, setShowLanding] = useState(true);
   const [activeMenu, setActiveMenu] = useState<MenuType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   // 🌟 [추가] 뉴스 탭의 초기 뷰를 결정하는 상태
   const [newsInitialView, setNewsInitialView] = useState<string | undefined>(undefined);
@@ -63,17 +66,18 @@ function MainContent() {
       {/* 메인 앱 */}
       <div className={`flex min-h-screen bg-gray-50 dark:bg-black font-sans transition-all duration-500 ${showLanding ? 'opacity-0' : 'opacity-100'}`}>
         {/* 사이드바 */}
-        <Sidebar 
-          activeMenu={activeMenu} 
-          onMenuChange={handleMenuChange} // 🌟 handleMenuChange로 교체
+        <Sidebar
+          activeMenu={activeMenu}
+          onMenuChange={handleMenuChange}
           isCollapsed={sidebarCollapsed}
           onCollapseChange={setSidebarCollapsed}
         />
 
         {/* 메인 컨텐츠 영역 */}
         <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-          {/* 우측 상단 로그인 버튼 */}
-          <div className="fixed top-6 right-6 z-50">
+          {/* 우측 상단 — 테마 토글 + 로그인 */}
+          <div className="fixed top-4 right-6 z-50 flex items-center gap-2">
+            <ThemeToggle />
             <LoginButton />
           </div>
 
@@ -85,6 +89,21 @@ function MainContent() {
           </main>
         </div>
       </div>
+
+      {/* 피드백 플로팅 버튼 */}
+      {!showLanding && (
+        <button
+          onClick={() => setIsFeedbackOpen(true)}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 rounded-full shadow-lg border border-gray-200 dark:border-zinc-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 dark:hover:bg-indigo-600 dark:hover:border-indigo-600 transition-all duration-200 group text-sm font-bold hover:-translate-y-0.5 hover:shadow-xl"
+          title="오류 제보 또는 건의사항"
+        >
+          <span className="text-base group-hover:scale-110 transition-transform">📬</span>
+          <span>의견 보내기</span>
+        </button>
+      )}
+
+      {/* 피드백 모달 */}
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </>
   );
 }

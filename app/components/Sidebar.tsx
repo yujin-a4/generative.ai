@@ -89,17 +89,10 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
         })}
       </nav>
 
-      {/* 🌟 하단 푸터 수정됨 */}
       {!isCollapsed && (
-        <div className="p-6 mb-2">
-          {/* 크기 up (text-xs -> text-sm) */}
-          <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
-            YBM AI Lab
-          </p>
-          {/* 크기 up (text-[10px] -> text-xs) & 색상 진하게 (gray-300 -> gray-400) */}
-          <p className="text-xs text-gray-300 dark:text-gray-500 mt-0.5">
-            Yujin Kang
-          </p>
+        <div className="p-6 mb-2 border-t border-gray-200 dark:border-zinc-800">
+          <p className="text-sm font-bold text-gray-500 dark:text-gray-400">YBM AI Lab</p>
+          <p className="text-xs text-gray-300 dark:text-gray-500 mt-0.5">Yujin Kang</p>
         </div>
       )}
     </div>
