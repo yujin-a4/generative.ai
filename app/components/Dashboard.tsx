@@ -257,8 +257,8 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
   }, [allNews]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans p-8 relative">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-5 py-4 relative">
+      <div className="w-full">
         <div className="mb-6"><h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">📊 대시보드</h1><p className="text-gray-500 dark:text-gray-400">AI 트렌드 분석 플랫폼의 주요 정보를 한눈에 확인하세요</p></div>
         <div className="mb-8 relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 shadow-lg text-white"><div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]"></div><div className="relative p-5 flex flex-col md:flex-row items-start md:items-center gap-4"><div className="flex-shrink-0 flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full backdrop-blur-md border border-white/30"><span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span><span className="text-xs font-bold tracking-wider">LIVE TREND</span></div><div className="flex-1">{isHeadlineLoading ? (<div className="h-7 w-full md:w-2/3 bg-white/20 rounded animate-pulse"></div>) : (<p className="text-lg md:text-xl font-bold leading-snug drop-shadow-sm">{trendHeadline?.headline || "현재 수집된 데이터로 트렌드를 분석하고 있습니다..."}</p>)}</div></div></div>
 

@@ -20,8 +20,8 @@ export default function NewsTab({ initialView }: NewsTabProps) {
   const [editTarget, setEditTarget] = useState<NewsArticle | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // 🌟 [수정] initialView 정보가 있으면 해당 모드로 초기화 (기본값: category)
-  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">(initialView || "category");
+  // initialView 정보가 있으면 해당 모드로 초기화 (기본값: timeline)
+  const [viewMode, setViewMode] = useState<"timeline" | "category" | "bookmarks">(initialView || "timeline");
 
   // 외부(대시보드 더보기 등)에서 정보가 변경될 때 반영
   useEffect(() => {
@@ -53,10 +53,10 @@ export default function NewsTab({ initialView }: NewsTabProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="w-full px-5 py-5">
       
       {/* 1. 헤더 영역 */}
-      <div className="flex flex-col gap-4 mb-8 border-b border-gray-200 dark:border-zinc-800 pb-8">
+      <div className="flex flex-col gap-4 mb-6 border-b border-gray-200 dark:border-zinc-800 pb-6">
         
         {/* 🛠️ [수정] items-end를 유지하되, 화면이 좁아질 때 제목이 깨지지 않도록 속성 추가 */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">

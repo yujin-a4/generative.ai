@@ -245,6 +245,17 @@ export async function publishWeeklySummary(id: string) {
   }
 }
 
+// 주간 요약 비공개 전환
+export async function unpublishWeeklySummary(id: string) {
+  try {
+    const summaryRef = doc(db, "weekly_summaries", id);
+    await updateDoc(summaryRef, { isPublished: false });
+  } catch (error) {
+    console.error("Error unpublishing weekly summary: ", error);
+    throw error;
+  }
+}
+
 // 주간 요약 삭제하기
 export async function deleteWeeklySummary(id: string) {
   try {
@@ -332,6 +343,16 @@ export async function publishMonthlySummary(id: string) {
     await updateDoc(summaryRef, { isPublished: true });
   } catch (error) {
     console.error("Error publishing monthly summary: ", error);
+    throw error;
+  }
+}
+
+export async function unpublishMonthlySummary(id: string) {
+  try {
+    const summaryRef = doc(db, "monthly_summaries", id);
+    await updateDoc(summaryRef, { isPublished: false });
+  } catch (error) {
+    console.error("Error unpublishing monthly summary: ", error);
     throw error;
   }
 }

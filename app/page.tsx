@@ -26,6 +26,8 @@ function MainContent() {
     if (hasSeenLanding === 'true') {
       setShowLanding(false);
     }
+    // 페이지 초기 로드 시 항상 최상단으로
+    window.scrollTo(0, 0);
   }, []);
 
   const handleEnter = () => {
@@ -36,8 +38,9 @@ function MainContent() {
   // 🌟 [추가] 대시보드에서 보낸 'timeline' 정보를 처리하는 핸들러
   const handleMenuChange = (menu: MenuType, subView?: string) => {
     setActiveMenu(menu);
+    window.scrollTo(0, 0);
     if (menu === 'news') {
-      setNewsInitialView(subView); // 'timeline' 정보 저장
+      setNewsInitialView(subView);
     } else {
       setNewsInitialView(undefined);
     }
@@ -82,7 +85,7 @@ function MainContent() {
           </div>
 
           {/* 컨텐츠 */}
-          <main className="pb-20 pt-6">
+          <main className="pb-12 pt-4">
             <Suspense fallback={<div className="text-center py-20">로딩 중...</div>}>
               {renderContent()}
             </Suspense>

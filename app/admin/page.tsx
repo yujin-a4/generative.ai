@@ -5,6 +5,14 @@ import { analyzeReports, saveReportToDB, fetchTTSEloFromAPI } from "@/app/action
 import { getAllFeedbacks, markFeedbackResolved } from "@/app/actions/feedbackActions";
 import { reCategorizeAllNews, getNewsCategoryStats, type ReCategorizeStats } from "@/app/actions/migrationActions";
 import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
+import {
+  getWeeklySummaries, getMonthlySummaries,
+  publishWeeklySummary, unpublishWeeklySummary, deleteWeeklySummary,
+  publishMonthlySummary, unpublishMonthlySummary, deleteMonthlySummary,
+} from "@/app/lib/newsService";
+import { generateWeeklySummary } from "@/app/actions/generateWeeklySummary";
+import { generateMonthlySummary } from "@/app/actions/generateMonthlySummary";
+import SummaryModal from "@/app/components/NewsTab/SummaryModal";
 import ReportView from "./ReportView";
 import ThemeToggle from "@/app/components/ThemeToggle";
 
@@ -95,7 +103,7 @@ function SectionHeader({ step, title, desc }: { step: number; title: string; des
 }
 
 export default function AdminPage() {
-  const [adminTab, setAdminTab]         = useState<'report' | 'feedback' | 'tools'>('report');
+  const [adminTab, setAdminTab]         = useState<'report' | 'feedback' | 'tools' | 'reports'>('report');
   const [selectedType, setSelectedType] = useState("LLM");
   const [inputs, setInputs]             = useState<Record<string, string>>({});
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -118,6 +126,18 @@ export default function AdminPage() {
   const [migrRunning, setMigrRunning]   = useState(false);
   const [migrResult, setMigrResult]     = useState<ReCategorizeStats | null>(null);
   const [migrError, setMigrError]       = useState<string | null>(null);
+  // 리포트 관리
+  const [weeklies, setWeeklies]           = useState<any[]>([]);
+  const [monthlies, setMonthlies]         = useState<any[]>([]);
+  const [rptLoading, setRptLoading]       = useState(false);
+  const [rptGenerating, setRptGenerating] = useState<string | null>(null);
+  const [rptTab, setRptTab]               = useState<'weekly' | 'monthly'>('monthly');
+  // 어드민 내 리포트 미리보기 모달
+  const [adminModal, setAdminModal]       = useState<{
+    type: 'weekly' | 'monthly';
+    weekLabel?: string; weekStartDate?: string; weekEndDate?: string;
+    year?: number; month?: number;
+  } | null>(null);
 
   const loadFeedbacks = async () => {
     setFbLoading(true);
@@ -133,6 +153,66 @@ export default function AdminPage() {
     setCatLoading(false);
   };
 
+  const loadReports = async () => {
+    setRptLoading(true);
+    const [w, m] = await Promise.all([
+      getWeeklySummaries(true),   // includeUnpublished = true
+      getMonthlySummaries(true),
+    ]);
+    setWeeklies(w as any[]);
+    setMonthlies(m as any[]);
+    setRptLoading(false);
+  };
+
+  const togglePublish = async (type: 'weekly' | 'monthly', id: string, current: boolean) => {
+    try {
+      if (type === 'weekly') {
+        current ? await unpublishWeeklySummary(id) : await publishWeeklySummary(id);
+      } else {
+        current ? await unpublishMonthlySummary(id) : await publishMonthlySummary(id);
+      }
+      loadReports();
+    } catch { alert('실패'); }
+  };
+
+  const handleDeleteReport = async (type: 'weekly' | 'monthly', id: string, label: string) => {
+    if (!confirm(`"${label}" 리포트를 삭제하시겠습니까?`)) return;
+    try {
+      if (type === 'weekly') await deleteWeeklySummary(id);
+      else await deleteMonthlySummary(id);
+      loadReports();
+    } catch { alert('삭제 실패'); }
+  };
+
+  // 주간 리포트 직접 생성 (날짜 입력)
+  const [newWeekLabel, setNewWeekLabel]   = useState('');
+  const [newWeekStart, setNewWeekStart]   = useState('');
+  const [newWeekEnd, setNewWeekEnd]       = useState('');
+  const [newMonthYear, setNewMonthYear]   = useState(new Date().getFullYear());
+  const [newMonthMonth, setNewMonthMonth] = useState(new Date().getMonth() + 1);
+
+  const handleGenerateWeekly = async () => {
+    if (!newWeekLabel || !newWeekStart || !newWeekEnd) { alert('주차 라벨과 기간을 모두 입력해주세요.'); return; }
+    setRptGenerating('weekly');
+    const res = await generateWeeklySummary(newWeekLabel, newWeekStart, newWeekEnd);
+    setRptGenerating(null);
+    if (res.success) {
+      await loadReports();
+      setAdminModal({ type: 'weekly', weekLabel: newWeekLabel, weekStartDate: newWeekStart, weekEndDate: newWeekEnd });
+    } else { alert('실패: ' + res.error); }
+  };
+
+  const handleGenerateMonthly = async () => {
+    setRptGenerating('monthly');
+    const label = `${newMonthYear}년 ${newMonthMonth}월`;
+    const res = await generateMonthlySummary(label, newMonthYear, newMonthMonth);
+    setRptGenerating(null);
+    if (res.success) {
+      await loadReports();
+      setAdminModal({ type: 'monthly', year: newMonthYear, month: newMonthMonth });
+    } else { alert('실패: ' + res.error); }
+  };
+
   const runMigration = async () => {
     if (!confirm(`전체 기사(${catTotal}건)을 다시 분류합니다. Gemini API를 사용합니다. 계속하시겠습니까?`)) return;
     setMigrRunning(true); setMigrResult(null); setMigrError(null);
@@ -145,6 +225,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (adminTab === 'feedback') loadFeedbacks();
     if (adminTab === 'tools') loadCatStats();
+    if (adminTab === 'reports') loadReports();
   }, [adminTab]);
 
   useEffect(() => {
@@ -223,6 +304,20 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 flex flex-col">
 
+      {/* 어드민 리포트 미리보기 모달 */}
+      {adminModal && (
+        <SummaryModal
+          isOpen={true}
+          onClose={() => { setAdminModal(null); loadReports(); }}
+          type={adminModal.type}
+          weekLabel={adminModal.weekLabel}
+          weekStartDate={adminModal.weekStartDate}
+          weekEndDate={adminModal.weekEndDate}
+          year={adminModal.year}
+          month={adminModal.month}
+        />
+      )}
+
       {/* 헤더 */}
       <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 px-8 py-4 flex items-center justify-between flex-shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
@@ -290,6 +385,25 @@ export default function AdminPage() {
             </button>
           </div>
 
+          {/* 리포트 관리 버튼 */}
+          <div className="mx-3 mt-2">
+            <button
+              onClick={() => setAdminTab('reports')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
+                adminTab === 'reports'
+                  ? 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white ring-1 ring-indigo-400'
+                  : 'text-gray-500 dark:text-zinc-500 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800/60'
+              }`}
+            >
+              <span className="text-xl w-6 text-center flex-shrink-0">📋</span>
+              <div className="leading-tight">
+                <div className="font-bold text-xs">리포트 관리</div>
+                <div className="text-[10px] text-gray-400 dark:text-zinc-600 mt-0.5">주간 · 월간 리포트</div>
+              </div>
+              {adminTab === 'reports' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+            </button>
+          </div>
+
           {/* 데이터 관리 버튼 */}
           <div className="mx-3 mt-2">
             <button
@@ -318,10 +432,202 @@ export default function AdminPage() {
         </aside>
 
         {/* 메인 */}
-        {adminTab === 'tools' ? (
+        {adminTab === 'reports' ? (
+          /* ─── 리포트 관리 ─── */
+          <main className="flex-1 overflow-y-auto">
+            <div className="w-full px-5 py-6">
+              {/* 헤더 */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white">📋 리포트 관리</h2>
+                  <p className="text-sm text-gray-400 dark:text-zinc-500 mt-0.5">생성 · 공개 전환 · 삭제 · 미리보기</p>
+                </div>
+                <button onClick={loadReports} disabled={rptLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200 border border-gray-200 dark:border-zinc-700 rounded-lg transition-all disabled:opacity-40">
+                  {rptLoading ? <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : '↺'}
+                  새로고침
+                </button>
+              </div>
+
+              {/* 탭 */}
+              <div className="flex gap-1 mb-6 bg-gray-100 dark:bg-zinc-800 p-1 rounded-xl w-fit">
+                {(['monthly', 'weekly'] as const).map(t => (
+                  <button key={t} onClick={() => setRptTab(t)}
+                    className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      rptTab === t ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-gray-500 dark:text-zinc-400'
+                    }`}>
+                    {t === 'monthly' ? `📊 월간 (${monthlies.length})` : `📅 주간 (${weeklies.length})`}
+                  </button>
+                ))}
+              </div>
+
+              {rptTab === 'monthly' ? (
+                /* ─── 월간: 연도별 12칸 그리드 ─── */
+                <div className="space-y-8">
+                  {/* 생성 폼 */}
+                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-5">
+                    <h3 className="font-bold text-sm text-gray-700 dark:text-zinc-300 mb-4">📊 월간 리포트 생성</h3>
+                    <div className="flex gap-3 items-end flex-wrap">
+                      <div className="flex gap-2">
+                        <input type="number" value={newMonthYear} onChange={e => setNewMonthYear(Number(e.target.value))}
+                          min={2024} max={2030}
+                          className="w-20 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-400" />
+                        <select value={newMonthMonth} onChange={e => setNewMonthMonth(Number(e.target.value))}
+                          className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-400">
+                          {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                            <option key={m} value={m}>{m}월</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button onClick={handleGenerateMonthly} disabled={rptGenerating === 'monthly'}
+                        className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5">
+                        {rptGenerating === 'monthly'
+                          ? <><span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" /> 분석 중...</>
+                          : '✨ 생성하기'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 연도별 12월 그리드 */}
+                  {rptLoading ? (
+                    <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>
+                  ) : (() => {
+                    const monthliesByKey: Record<string, any> = {};
+                    monthlies.forEach(m => { monthliesByKey[`${m.year}-${m.month}`] = m; });
+                    const years = [...new Set([
+                      new Date().getFullYear(),
+                      ...monthlies.map((m: any) => m.year)
+                    ])].sort((a, b) => b - a);
+                    return (
+                      <div className="space-y-6">
+                        {years.map(yr => (
+                          <div key={yr}>
+                            <p className="text-xs font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-3">{yr}년</p>
+                            <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
+                              {Array.from({length: 12}, (_, i) => i + 1).map(mo => {
+                                const rpt = monthliesByKey[`${yr}-${mo}`];
+                                const isPublished = rpt?.isPublished === true;
+                                return (
+                                  <button key={mo}
+                                    onClick={() => rpt
+                                      ? setAdminModal({ type: 'monthly', year: yr, month: mo })
+                                      : (() => { setNewMonthYear(yr); setNewMonthMonth(mo); })()}
+                                    className={`flex flex-col items-center justify-center py-3 rounded-xl border text-xs font-bold transition-all ${
+                                      rpt
+                                        ? isPublished
+                                          ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:ring-2 hover:ring-emerald-400'
+                                          : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 hover:ring-2 hover:ring-yellow-400'
+                                        : 'bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-300 dark:text-zinc-600 hover:border-indigo-300 hover:text-indigo-400'
+                                    }`}>
+                                    <span className="text-base mb-0.5">
+                                      {rpt ? (isPublished ? '✅' : '🔒') : '+'}
+                                    </span>
+                                    <span>{mo}월</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* ─── 주간: 월별 그룹 카드 ─── */
+                <div className="space-y-8">
+                  {/* 생성 폼 */}
+                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-5">
+                    <h3 className="font-bold text-sm text-gray-700 dark:text-zinc-300 mb-4">📅 주간 리포트 생성</h3>
+                    <div className="flex gap-3 items-end flex-wrap">
+                      <input type="text" placeholder="주차 라벨 (예: 4월 3주차)"
+                        value={newWeekLabel} onChange={e => setNewWeekLabel(e.target.value)}
+                        className="flex-1 min-w-[140px] px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-400" />
+                      <input type="date" value={newWeekStart} onChange={e => setNewWeekStart(e.target.value)}
+                        className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-400" />
+                      <span className="text-xs text-gray-400">~</span>
+                      <input type="date" value={newWeekEnd} onChange={e => setNewWeekEnd(e.target.value)}
+                        className="px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-400" />
+                      <button onClick={handleGenerateWeekly} disabled={rptGenerating === 'weekly'}
+                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5">
+                        {rptGenerating === 'weekly'
+                          ? <><span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" /> 분석 중...</>
+                          : '✨ 생성하기'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 주간 목록: created_at 내림차순 단순 정렬 리스트 */}
+                  {rptLoading ? (
+                    <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>
+                  ) : weeklies.length === 0 ? (
+                    <p className="text-center text-sm text-gray-400 dark:text-zinc-500 py-8">생성된 주간 리포트가 없습니다.</p>
+                  ) : (
+                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                      {[...weeklies]
+                        .sort((a, b) => {
+                          const aTime = a.created_at?.toMillis?.() ?? (a.created_at?.seconds ?? 0) * 1000;
+                          const bTime = b.created_at?.toMillis?.() ?? (b.created_at?.seconds ?? 0) * 1000;
+                          return bTime - aTime; // 최신순
+                        })
+                        .map((rpt: any, idx: number) => {
+                          const label = rpt.week_label || '(라벨 없음)';
+                          const isPublished = rpt.isPublished === true;
+                          const headline = rpt.headline || '';
+                          const startDate = rpt.start_date || '';
+                          const endDate = rpt.end_date || '';
+                          const createdAt = rpt.created_at?.toDate?.()?.toLocaleDateString('ko-KR', { year:'numeric', month:'short', day:'numeric' }) || '-';
+                          return (
+                            <div key={rpt.id}
+                              onClick={() => setAdminModal({ type: 'weekly', weekLabel: label, weekStartDate: startDate, weekEndDate: endDate })}
+                              className={`flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/60 transition-all ${idx > 0 ? 'border-t border-gray-100 dark:border-zinc-800' : ''}`}>
+                              {/* 공개 상태 */}
+                              <span className={`flex-shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full ${
+                                isPublished
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                              }`}>
+                                {isPublished ? '✅ 공개' : '🔒 비공개'}
+                              </span>
+                              {/* 주차 라벨 */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-gray-800 dark:text-zinc-200">{label}</span>
+                                  {rpt.version === 2 && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-1.5 py-0.5 rounded">v2</span>}
+                                </div>
+                                {headline && <p className="text-xs text-gray-400 dark:text-zinc-500 truncate mt-0.5">{headline}</p>}
+                              </div>
+                              {/* 생성일 */}
+                              <span className="flex-shrink-0 text-xs text-gray-400 dark:text-zinc-600 hidden sm:block">{createdAt}</span>
+                              {/* 액션 버튼 */}
+                              <div className="flex gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => togglePublish('weekly', rpt.id, isPublished)}
+                                  className="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-zinc-400 hover:border-indigo-400 hover:text-indigo-600 transition-all">
+                                  {isPublished ? '비공개' : '공개'}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReport('weekly', rpt.id, label)}
+                                  className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 transition-all">
+                                  삭제
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 월간 목록 미리보기 버튼 / 공개 전환 / 삭제 (그리드 클릭으로 대체, 여기선 결제 로직용 비워둠) */}
+            </div>
+          </main>
+
+        ) : adminTab === 'tools' ? (
           /* ─── 데이터 관리 ─── */
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-8">
+            <div className="w-full px-5 py-6">
 
               <div className="mb-8">
                 <h2 className="text-xl font-black text-gray-900 dark:text-white">🔧 데이터 관리</h2>
@@ -436,7 +742,7 @@ export default function AdminPage() {
         ) : adminTab === 'feedback' ? (
           /* ─── 피드백함 ─── */
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-8">
+            <div className="w-full px-5 py-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-black text-gray-900 dark:text-white">📬 피드백함</h2>
@@ -518,7 +824,7 @@ export default function AdminPage() {
         ) : (
           /* ─── 리포트 생성 (기존) ─── */
           <main className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-8 py-8">
+          <div className="w-full px-5 py-6">
 
             {/* 제목 */}
             <div className="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200 dark:border-zinc-800">
@@ -662,7 +968,7 @@ export default function AdminPage() {
             </div>
 
             {/* 분석 버튼 (sticky) */}
-            <div className="sticky bottom-0 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur -mx-8 px-8 py-5 border-t border-gray-200 dark:border-zinc-800">
+            <div className="sticky bottom-0 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur -mx-5 px-5 py-5 border-t border-gray-200 dark:border-zinc-800">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 flex-wrap">
                   {isTTS && (

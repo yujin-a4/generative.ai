@@ -94,7 +94,7 @@ export default function ReportTab() {
   return (
     <div className="w-full">
       {/* 1. 메인 헤더 영역 (기존 유지) */}
-      <div className="max-w-7xl mx-auto px-6 pt-8 mb-4">
+      <div className="w-full px-5 pt-5 mb-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">AI 순위 리포트</h1>
         <p className="text-gray-500 dark:text-gray-400">
           공신력 있는 벤치마크 데이터를 기반으로 한 분야별 모델 성능 순위를 확인하세요.
@@ -102,7 +102,7 @@ export default function ReportTab() {
       </div>
 
       {/* 🛠️ [수정] 2. 탭 네비게이션: AI 뉴스 스타일로 통일 (카드 컨테이너 적용) */}
-      <div className="max-w-7xl mx-auto px-6 mb-8">
+      <div className="w-full px-5 mb-6">
         <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 shadow-sm flex overflow-x-auto no-scrollbar gap-2">
           {REPORT_CATEGORIES.map((cat) => (
             <button
@@ -122,7 +122,7 @@ export default function ReportTab() {
       </div>
 
       {/* 3. 실제 리포트 컨텐츠 영역 */}
-      <div className="max-w-7xl mx-auto px-6 pb-12">
+      <div className="w-full px-5 pb-12">
       {/* 🛠️ [수정] 빨간색 네모 부분(중복 제목) 삭제 및 버튼만 우측 정렬 */}
       <div className="flex justify-end mb-2 pb-2 border-b border-gray-100 dark:border-zinc-800">
           <Link 
