@@ -6,86 +6,147 @@ import * as cheerio from "cheerio";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 /**
- * 🌟 구글 뉴스 암호화 주소(CBMi...)를 즉시 해독하는 함수
- * 스크린샷에서 발생한 search() 문법 오류를 해결하고 정밀하게 추출합니다.
+ * Google News 리다이렉트 URL → 실제 기사 URL 해석
+ * 1차: HTTP redirect follow (가장 신뢰도 높음)
+ * 2차: base64 디코딩 시도
  */
-function resolveGoogleUrl(url: string): string {
+async function resolveGoogleNewsUrl(url: string): Promise<string> {
   if (!url || !url.includes("news.google.com")) return url;
 
+  // 1차: HTTP redirect follow
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+    const finalUrl = res.url;
+    if (finalUrl && !finalUrl.includes("news.google.com")) {
+      console.log("🎯 HTTP 리다이렉트 해독:", finalUrl);
+      return finalUrl;
+    }
+    // JavaScript 리다이렉트 파싱 시도
+    const html = await res.text();
+    const jsRedirect = html.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/);
+    if (jsRedirect?.[1] && !jsRedirect[1].includes("news.google.com")) {
+      console.log("🎯 JS 리다이렉트 해독:", jsRedirect[1]);
+      return jsRedirect[1];
+    }
+  } catch (e) {
+    console.warn("HTTP redirect 추적 실패:", e);
+  }
+
+  // 2차: base64 디코딩
   try {
     const parts = url.split("/");
-    const encodedData = parts[parts.length - 1]?.split("?")[0];
-    
-    if (encodedData) {
-      const buffer = Buffer.from(encodedData, "base64");
-      const decoded = buffer.toString("binary");
-      
+    const encoded = parts[parts.length - 1]?.split("?")?.[0];
+    if (encoded) {
+      const buf = Buffer.from(encoded, "base64");
+      const decoded = buf.toString("binary");
       const start = decoded.indexOf("http");
       if (start !== -1) {
-        // search()는 인자를 하나만 받으므로 자른 후 검색함
         const suffix = decoded.substring(start);
-        const endOfUrl = suffix.search(/[^\x20-\x7E]/);
-        const actualUrl = endOfUrl !== -1 ? suffix.substring(0, endOfUrl) : suffix;
-        
-        console.log("🎯 구글 주소 해독 성공 -> 원문 접속:", actualUrl);
-        return actualUrl;
+        const end = suffix.search(/[^\x20-\x7E]/);
+        const resolved = end !== -1 ? suffix.substring(0, end) : suffix;
+        if (resolved.startsWith("http") && !resolved.includes("news.google.com")) {
+          console.log("🎯 base64 해독 성공:", resolved);
+          return resolved;
+        }
       }
     }
   } catch (e) {
-    console.error("구글 URL 해독 실패:", e);
+    console.warn("base64 해독 실패:", e);
   }
+
   return url;
 }
 
-export async function analyzeNewsArticle(url: string, manualText?: string) {
+export async function analyzeNewsArticle(
+  url: string,
+  manualText?: string,
+  fallbackText?: string  // RSS 요약 텍스트 (URL fetch 실패 시 사용)
+) {
   console.log("🔍 분석 시작 URL:", url);
 
   try {
     let bodyText = "";
     let title = "";
-    
-    // 1. 🌟 구글 주소를 진짜 언론사 주소로 즉시 변환
-    const targetUrl = resolveGoogleUrl(url);
+
+    // Google URL → 실제 기사 URL 변환
+    const targetUrl = await resolveGoogleNewsUrl(url);
+    console.log("🔗 최종 접속 URL:", targetUrl);
 
     if (manualText && manualText.trim().length > 0) {
+      // 사용자 직접 입력
       bodyText = manualText.trim().slice(0, 15000);
       title = "직접 입력된 콘텐츠";
     } else {
-      const response = await fetch(targetUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
-      });
-      
-      if (!response.ok) throw new Error(`사이트 접속 실패 (${response.status})`);
-      
-      const html = await response.text();
-      const $ = cheerio.load(html);
-      $("script, style, nav, footer, header, aside, iframe, noscript").remove();
-      
-      title = $("title").text().trim() || $("meta[property='og:title']").attr("content") || "";
-      
-      bodyText = $("article").text() || $("#content").text() || $(".article_view").text() || $(".article-body").text() || $("main").text() || "";
+      // URL에서 본문 fetch
+      let fetchSuccess = false;
+      try {
+        const response = await fetch(targetUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+        });
 
-      if (bodyText.replace(/\s+/g, " ").trim().length < 100) {
-        bodyText = $("p").map((i, el) => $(el).text()).get().join(" ");
+        if (response.ok) {
+          const html = await response.text();
+          const { load } = await import("cheerio");
+          const $ = load(html);
+          $("script, style, nav, footer, header, aside, iframe, noscript").remove();
+
+          title =
+            $("title").text().trim() ||
+            $("meta[property='og:title']").attr("content") ||
+            "";
+
+          bodyText =
+            $("article").text() ||
+            $("#content").text() ||
+            $(".article_view").text() ||
+            $(".article-body").text() ||
+            $("main").text() ||
+            "";
+
+          if (bodyText.replace(/\s+/g, " ").trim().length < 100) {
+            bodyText = $("p")
+              .map((_, el) => $(el).text())
+              .get()
+              .join(" ");
+          }
+
+          bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
+          console.log("✅ 본문 추출 완료 (길이):", bodyText.length);
+          if (bodyText.length >= 50) fetchSuccess = true;
+        }
+      } catch (fetchErr) {
+        console.warn("⚠️ URL fetch 실패:", fetchErr);
       }
 
-      bodyText = bodyText.replace(/\s+/g, " ").trim().slice(0, 15000);
-      console.log("✅ 본문 추출 완료 (길이):", bodyText.length);
-
-      if (bodyText.length < 50) throw new Error("본문을 읽어올 수 없습니다.");
+      // fetch 실패 또는 본문 부족 → RSS 요약 텍스트 사용
+      if (!fetchSuccess) {
+        if (fallbackText && fallbackText.trim().length >= 30) {
+          console.log("📋 RSS 요약 텍스트로 대체 분석");
+          bodyText = fallbackText.trim().slice(0, 5000);
+        } else {
+          throw new Error("본문을 읽어올 수 없습니다. (URL fetch 실패, RSS 요약도 없음)");
+        }
+      }
     }
 
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash", 
-        generationConfig: { responseMimeType: "application/json" }
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" },
     });
 
     const prompt = `
     다음 뉴스 기사를 분석하고 JSON 포맷으로 요약해줘.
     이 뉴스 사이트는 교육 출판사 직원들이 사용하는 AI 트렌드 모니터링 플랫폼이야.
-    오늘 날짜는 ${new Date().toISOString().split('T')[0]}이야.
+    오늘 날짜는 ${new Date().toISOString().split("T")[0]}이야.
     
     [기사 정보]
     - URL: ${targetUrl}
@@ -127,21 +188,17 @@ export async function analyzeNewsArticle(url: string, manualText?: string) {
     }
     `;
 
-
     const result = await model.generateContent(prompt);
     let text = result.response.text();
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
     try {
-        let parsedData = JSON.parse(text);
-        if (Array.isArray(parsedData)) parsedData = parsedData[0];
-        
-        // 🌟 해독된 진짜 URL을 결과에 포함시켜 반환
-        return { ...parsedData, resolvedUrl: targetUrl };
-    } catch (e) {
-        throw new Error("AI 분석 결과 형식이 잘못되었습니다.");
+      let parsedData = JSON.parse(text);
+      if (Array.isArray(parsedData)) parsedData = parsedData[0];
+      return { ...parsedData, resolvedUrl: targetUrl };
+    } catch {
+      throw new Error("AI 분석 결과 형식이 잘못되었습니다.");
     }
-
   } catch (error: any) {
     console.error("❌ 최종 분석 실패:", error);
     throw new Error(error.message || "뉴스 분석 과정에서 오류가 발생했습니다.");

@@ -7,6 +7,16 @@ import NewsCard from "./NewsCard";
 import NewsLoading from "./NewsLoading";
 import SummaryModal from "./SummaryModal";
 import { getMonthWeeks, getMonthLabel, getMonthSortKey } from "@/app/lib/weekUtils";
+import { getWeeklySummaries, getMonthlySummaries } from "@/app/lib/newsService";
+
+// 2주(14일) 이내 생성된 리포트인지 확인
+function isRecentReport(createdAt: any): boolean {
+  if (!createdAt) return false;
+  const ts = createdAt?.toDate?.() ?? createdAt;
+  if (!ts) return false;
+  const diffMs = Date.now() - new Date(ts).getTime();
+  return diffMs < 14 * 24 * 60 * 60 * 1000;
+}
 
 interface NewsTimelineProps {
   refreshKey: number;
@@ -53,6 +63,10 @@ export default function NewsTimeline({
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
 
+  // 주간/월간 요약 NEW 배지용
+  const [weeklySummaryMap, setWeeklySummaryMap] = useState<Record<string, any>>({});
+  const [monthlySummaryMap, setMonthlySummaryMap] = useState<Record<string, any>>({});
+
   const [summaryModal, setSummaryModal] = useState<{
     isOpen: boolean;
     type: "weekly" | "monthly";
@@ -68,6 +82,21 @@ export default function NewsTimeline({
       refetch();
     }
   }, [refreshKey, refetch]);
+
+  // 주간/월간 요약 목록 fetch (NEW 배지용)
+  useEffect(() => {
+    getWeeklySummaries(false).then(list => {
+      const map: Record<string, any> = {};
+      list.forEach((s: any) => { if (s.week_label) map[s.week_label] = s; });
+      setWeeklySummaryMap(map);
+    });
+    getMonthlySummaries(false).then(list => {
+      const map: Record<string, any> = {};
+      list.forEach((s: any) => { map[`${s.year}-${s.month}`] = s; });
+      setMonthlySummaryMap(map);
+    });
+  }, []);
+
 
   // 월별/주별 그룹핑 로직
   const groupedByMonth: Record<string, { 
@@ -252,9 +281,14 @@ export default function NewsTimeline({
                 {/* 월간 요약 버튼 */}
                 <button
                   onClick={() => openMonthlySummary(month.year, month.month)}
-                  className="px-4 py-2 mr-4 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                  className="relative px-4 py-2 mr-4 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors flex items-center gap-1.5"
                 >
                   📊 월간요약
+                  {isRecentReport(monthlySummaryMap[`${month.year}-${month.month}`]?.created_at) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-black rounded-full bg-red-500 text-white animate-pulse">
+                      NEW
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -280,9 +314,14 @@ export default function NewsTimeline({
                         {/* 주간 요약 버튼 */}
                         <button
                           onClick={() => openWeeklySummary(week.dbLabel, week.startDate, week.endDate)}
-                          className="px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                          className="relative px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors flex items-center gap-1.5"
                         >
                           📊 주간요약
+                          {isRecentReport(weeklySummaryMap[week.dbLabel]?.created_at) && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-black rounded-full bg-red-500 text-white animate-pulse">
+                              NEW
+                            </span>
+                          )}
                         </button>
                       </div>
 

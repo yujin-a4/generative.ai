@@ -9,6 +9,7 @@ import {
   getWeeklySummaries, getMonthlySummaries,
   publishWeeklySummary, unpublishWeeklySummary, deleteWeeklySummary,
   publishMonthlySummary, unpublishMonthlySummary, deleteMonthlySummary,
+  getDraftNews, updateNewsStatus,
 } from "@/app/lib/newsService";
 import { generateWeeklySummary } from "@/app/actions/generateWeeklySummary";
 import { generateMonthlySummary } from "@/app/actions/generateMonthlySummary";
@@ -103,7 +104,7 @@ function SectionHeader({ step, title, desc }: { step: number; title: string; des
 }
 
 export default function AdminPage() {
-  const [adminTab, setAdminTab]         = useState<'report' | 'feedback' | 'tools' | 'reports'>('report');
+  const [adminTab, setAdminTab]         = useState<'report' | 'feedback' | 'tools' | 'reports' | 'inbox'>('report');
   const [selectedType, setSelectedType] = useState("LLM");
   const [inputs, setInputs]             = useState<Record<string, string>>({});
   const [analysisResult, setAnalysisResult] = useState<any>(null);
@@ -126,6 +127,11 @@ export default function AdminPage() {
   const [migrRunning, setMigrRunning]   = useState(false);
   const [migrResult, setMigrResult]     = useState<ReCategorizeStats | null>(null);
   const [migrError, setMigrError]       = useState<string | null>(null);
+  // 기사함
+  const [draftNews, setDraftNews]       = useState<any[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [analyzingId, setAnalyzingId]   = useState<string | null>(null);
+  const [previewArticle, setPreviewArticle] = useState<{ result: any; article: any } | null>(null);
   // 리포트 관리
   const [weeklies, setWeeklies]           = useState<any[]>([]);
   const [monthlies, setMonthlies]         = useState<any[]>([]);
@@ -222,10 +228,18 @@ export default function AdminPage() {
     setMigrRunning(false);
   };
 
+  const loadDraftNews = async () => {
+    setInboxLoading(true);
+    const data = await getDraftNews();
+    setDraftNews(data as any[]);
+    setInboxLoading(false);
+  };
+
   useEffect(() => {
     if (adminTab === 'feedback') loadFeedbacks();
     if (adminTab === 'tools') loadCatStats();
     if (adminTab === 'reports') loadReports();
+    if (adminTab === 'inbox') loadDraftNews();
   }, [adminTab]);
 
   useEffect(() => {
@@ -318,6 +332,200 @@ export default function AdminPage() {
         />
       )}
 
+      {/* 기사 분석 결과 미리보기 + 편집 모달 */}
+      {previewArticle && (() => {
+        const { result, article } = previewArticle;
+        const set = (patch: Record<string, any>) =>
+          setPreviewArticle(prev => prev ? { ...prev, result: { ...prev.result, ...patch } } : null);
+
+        const CATEGORIES = [
+          { value: 'AI_TECH',      label: 'AI 기술',    color: 'indigo' },
+          { value: 'AI_SERVICE',   label: 'AI 서비스',  color: 'violet' },
+          { value: 'EDUTECH_AI',   label: '에듀테크 AI',color: 'emerald' },
+          { value: 'EDU_INDUSTRY', label: '교육 산업',  color: 'amber' },
+          { value: 'POLICY',       label: '정책/규제',  color: 'rose' },
+        ];
+        const fieldCls = "w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-colors";
+        const labelCls = "text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5 block";
+
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col border border-gray-200 dark:border-zinc-700">
+
+              {/* 헤더 */}
+              <div className="flex-shrink-0 bg-white/95 dark:bg-zinc-900/95 border-b border-gray-100 dark:border-zinc-800 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🤖</span>
+                  <span className="font-bold text-gray-900 dark:text-white text-sm">분석 결과 편집 및 게시</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">수정 후 게시</span>
+                </div>
+                <button onClick={() => setPreviewArticle(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 text-2xl font-light leading-none">×</button>
+              </div>
+
+              {/* 스크롤 영역 */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+                {/* 카테고리 */}
+                <div>
+                  <label className={labelCls}>카테고리</label>
+                  <div className="flex flex-wrap gap-2">
+                    {CATEGORIES.map(cat => (
+                      <button key={cat.value}
+                        onClick={() => set({ category: cat.value })}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-full border-2 transition-all ${
+                          result.category === cat.value
+                            ? `border-${cat.color}-500 bg-${cat.color}-500 text-white`
+                            : 'border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-zinc-400 hover:border-gray-400'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 제목 */}
+                <div>
+                  <label className={labelCls}>제목</label>
+                  <input
+                    type="text"
+                    value={result.title || article.title || ''}
+                    onChange={e => set({ title: e.target.value })}
+                    className={fieldCls + " font-semibold"}
+                  />
+                </div>
+
+                {/* 출처 + 날짜 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>출처 (언론사)</label>
+                    <input type="text" value={result.source || ''} onChange={e => set({ source: e.target.value })} className={fieldCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>날짜</label>
+                    <input type="date" value={result.date || ''} onChange={e => set({ date: e.target.value })} className={fieldCls} />
+                  </div>
+                </div>
+
+                {/* 한 줄 요약 */}
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-4 py-3">
+                  <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1.5 block">한 줄 요약 (50자 이내)</label>
+                  <input
+                    type="text"
+                    maxLength={80}
+                    value={result.shortSummary || ''}
+                    onChange={e => set({ shortSummary: e.target.value })}
+                    className="w-full bg-transparent text-sm font-semibold text-indigo-900 dark:text-indigo-200 focus:outline-none border-b border-indigo-200 dark:border-indigo-700 pb-0.5"
+                  />
+                </div>
+
+                {/* 상세 요약 */}
+                <div>
+                  <label className={labelCls}>상세 요약 (3줄)</label>
+                  <div className="space-y-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="flex gap-2 items-start">
+                        <span className="text-indigo-400 font-bold text-sm flex-shrink-0 mt-2">{i + 1}.</span>
+                        <textarea
+                          rows={2}
+                          value={(result.detailedSummary || [])[i] || ''}
+                          onChange={e => {
+                            const arr = [...(result.detailedSummary || ['', '', ''])];
+                            arr[i] = e.target.value;
+                            set({ detailedSummary: arr });
+                          }}
+                          className={fieldCls + " resize-none"}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 인사이트 */}
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl px-4 py-3">
+                  <label className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1.5 block">💡 인사이트 (교육 출판사 관점)</label>
+                  <textarea
+                    rows={3}
+                    value={result.insight || ''}
+                    onChange={e => set({ insight: e.target.value })}
+                    className="w-full bg-transparent text-sm text-amber-900 dark:text-amber-200 focus:outline-none resize-none border-b border-amber-200 dark:border-amber-700/50"
+                  />
+                </div>
+
+                {/* 태그 */}
+                <div>
+                  <label className={labelCls}>태그</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(result.tags || []).map((tag: string, i: number) => (
+                      <div key={i} className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-full pl-2.5 pr-1 py-0.5">
+                        <span className="text-xs text-gray-600 dark:text-zinc-300">{tag}</span>
+                        <button
+                          onClick={() => set({ tags: (result.tags || []).filter((_: string, j: number) => j !== i) })}
+                          className="text-gray-400 hover:text-rose-500 text-xs leading-none px-0.5"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="태그 입력 후 Enter (#포함)"
+                    className={fieldCls + " text-xs"}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val) {
+                          set({ tags: [...(result.tags || []), val.startsWith('#') ? val : `#${val}`] });
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* 원문 URL */}
+                <div>
+                  <label className={labelCls}>원문 URL</label>
+                  <a href={result.resolvedUrl || article.url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-indigo-500 hover:underline break-all">
+                    {result.resolvedUrl || article.url}
+                  </a>
+                </div>
+              </div>
+
+              {/* 하단 버튼 */}
+              <div className="flex-shrink-0 border-t border-gray-100 dark:border-zinc-800 px-6 py-4 flex gap-3 rounded-b-2xl bg-white/95 dark:bg-zinc-900/95">
+                <button
+                  onClick={async () => {
+                    try {
+                      const { updateDoc, doc } = await import('firebase/firestore');
+                      const { db } = await import('@/lib/firebase');
+                      await updateDoc(doc(db, 'news', article.id!), {
+                        ...result,
+                        status: 'published',
+                        isAuto: true,
+                        url: result.resolvedUrl || article.url,
+                      });
+                      setDraftNews(prev => prev.filter(n => n.id !== article.id));
+                      setPreviewArticle(null);
+                    } catch { alert('게시 실패'); }
+                  }}
+                  className="flex-1 py-2.5 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+                >
+                  ✓ 게시하기
+                </button>
+                <button
+                  onClick={() => setPreviewArticle(null)}
+                  className="px-6 py-2.5 text-sm font-bold bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-600 dark:text-zinc-300 rounded-xl transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 헤더 */}
       <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 px-8 py-4 flex items-center justify-between flex-shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
@@ -401,6 +609,30 @@ export default function AdminPage() {
                 <div className="text-[10px] text-gray-400 dark:text-zinc-600 mt-0.5">주간 · 월간 리포트</div>
               </div>
               {adminTab === 'reports' && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+            </button>
+          </div>
+
+          {/* 기사함 버튼 */}
+          <div className="mx-3 mt-2">
+            <button
+              onClick={() => setAdminTab('inbox')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
+                adminTab === 'inbox'
+                  ? 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-white ring-1 ring-amber-400'
+                  : 'text-gray-500 dark:text-zinc-500 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800/60'
+              }`}
+            >
+              <span className="text-xl w-6 text-center flex-shrink-0">📥</span>
+              <div className="leading-tight">
+                <div className="font-bold text-xs">기사함</div>
+                <div className="text-[10px] text-gray-400 dark:text-zinc-600 mt-0.5">자동수집 검토</div>
+              </div>
+              {draftNews.length > 0 && (
+                <span className="ml-auto text-[10px] font-black text-white bg-amber-500 rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center flex-shrink-0">
+                  {draftNews.length}
+                </span>
+              )}
+              {adminTab === 'inbox' && draftNews.length === 0 && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
             </button>
           </div>
 
@@ -817,6 +1049,145 @@ export default function AdminPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </main>
+        ) : adminTab === 'inbox' ? (
+          /* ─── 기사함 (자동수집 검토) ─── */
+          <main className="flex-1 overflow-y-auto">
+            <div className="w-full px-5 py-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white">📥 기사함</h2>
+                  <p className="text-sm text-gray-400 dark:text-zinc-500 mt-1">
+                    자동수집된 기사 <span className="text-amber-500 font-bold">{draftNews.length}건</span> 검토 대기 중
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!confirm('지금 바로 뉴스를 수집하시겠습니까? (최대 20건)')) return;
+                      try {
+                        const res = await fetch('/api/news/batch');
+                        const data = await res.json();
+                        alert(`✅ ${data.saved || 0}개 기사 수집 완료`);
+                        loadDraftNews();
+                      } catch { alert('수집 실패'); }
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                  >
+                    🔄 지금 수집
+                  </button>
+                  <button onClick={loadDraftNews} disabled={inboxLoading}
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">
+                    {inboxLoading ? '불러오는 중...' : '↺ 새로고침'}
+                  </button>
+                </div>
+              </div>
+
+              {inboxLoading && draftNews.length === 0 ? (
+                <div className="text-center py-20 text-gray-400">불러오는 중...</div>
+              ) : draftNews.length === 0 ? (
+                <div className="text-center py-20">
+                  <p className="text-4xl mb-3">📭</p>
+                  <p className="text-gray-500 dark:text-zinc-400 font-medium">검토 대기 기사가 없습니다.</p>
+                  <p className="text-sm text-gray-400 dark:text-zinc-500 mt-1">매일 08:30에 자동으로 수집됩니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 일괄 처리 버튼 */}
+                  <div className="flex items-center gap-2 pb-3 border-b border-gray-100 dark:border-zinc-800">
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`전체 ${draftNews.length}건을 모두 승인하시겠습니까?`)) return;
+                        await Promise.allSettled(draftNews.map(n => updateNewsStatus(n.id!, 'published')));
+                        loadDraftNews();
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg"
+                    >
+                      ✓ 전체 승인
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`전체 ${draftNews.length}건을 모두 거부하시겠습니까?`)) return;
+                        await Promise.allSettled(draftNews.map(n => updateNewsStatus(n.id!, 'rejected')));
+                        loadDraftNews();
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white rounded-lg"
+                    >
+                      ✕ 전체 거부
+                    </button>
+                    <span className="text-xs text-gray-400 ml-auto">승인하면 일반 뉴스 피드에 즉시 노출됩니다</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {draftNews.map((article: any) => (
+                      <div key={article.id}
+                        className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-4 flex flex-col gap-3"
+                      >
+                        {/* 상단: 메타정보 */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded">
+                            자동수집
+                          </span>
+                          <span className="text-[10px] text-gray-500 dark:text-zinc-400 font-medium">{article.autoSource || article.source}</span>
+                          <span className="text-[10px] text-gray-300 dark:text-zinc-600 ml-auto">
+                            {article.publishedAt?.toDate?.()?.toLocaleDateString('ko-KR') || article.publishedAt?.split?.('T')?.[0] || ''}
+                          </span>
+                        </div>
+
+                        {/* 제목 */}
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white leading-snug line-clamp-3 flex-1">
+                          {article.title}
+                        </p>
+
+                        {/* URL */}
+                        <a href={article.url} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] text-indigo-400 hover:text-indigo-600 hover:underline truncate block">
+                          {article.url}
+                        </a>
+
+                        {/* 버튼 그룹 */}
+                        <div className="flex gap-1.5 pt-1 border-t border-gray-100 dark:border-zinc-800">
+                          <button
+                            onClick={async () => {
+                              setAnalyzingId(article.id);
+                              try {
+                                const { analyzeNewsArticle } = await import('@/app/actions/analyzeNews');
+                                const result = await analyzeNewsArticle(article.url, '', article.rssSummary || article.title);
+                                // 바로 게시 대신 미리보기 모달 오픈
+                                setPreviewArticle({ result, article });
+                              } catch { alert('분석 실패. URL을 확인해주세요.'); }
+                              setAnalyzingId(null);
+                            }}
+                            disabled={analyzingId === article.id}
+                            className="flex-1 px-2 py-1.5 text-[11px] font-bold bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+                          >
+                            {analyzingId === article.id ? '분석 중...' : '🤖 분석 및 승인'}
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await updateNewsStatus(article.id!, 'published');
+                              setDraftNews(prev => prev.filter(n => n.id !== article.id));
+                            }}
+                            className="px-2 py-1.5 text-[11px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg transition-colors"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await updateNewsStatus(article.id!, 'rejected');
+                              setDraftNews(prev => prev.filter(n => n.id !== article.id));
+                            }}
+                            className="px-2 py-1.5 text-[11px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-lg transition-colors"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

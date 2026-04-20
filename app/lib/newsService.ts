@@ -10,7 +10,7 @@ export interface NewsArticle {
   url: string;
   title: string;
   source: string;
-  author?: string; // 🌟 [추가] 작성자 이름 필드
+  author?: string;
   shortSummary: string;
   detailedSummary: string[];
   insight: string;
@@ -20,9 +20,13 @@ export interface NewsArticle {
   createdAt?: any;
   views?: number;
   likes?: number;
-  likedBy?: string[]; 
+  likedBy?: string[];
   bookmarkedBy?: string[];
-  authorId?: string; 
+  authorId?: string;
+  // 자동 수집 관련
+  isAuto?: boolean;          // 자동 크롤링 여부
+  status?: 'published' | 'draft' | 'rejected'; // draft = 관리자 검토 대기
+  autoSource?: string;       // RSS 소스 명
 }
 
 // 뉴스 저장하기
@@ -84,24 +88,59 @@ export async function getRecentNews(limitCount = 20, sortBy: 'latest' | 'likes' 
   try {
     const newsCollection = collection(db, "news");
     let q;
-
+    // status: 'draft' 또는 'rejected'인 자동수집 기사는 제외
+    // Firestore 복합 이켤 한계로 where status != 'draft' 동작 안 함 → 클라이언트 필터
     if (sortBy === 'likes') {
-      q = query(newsCollection, orderBy("likes", "desc"), limit(limitCount));
+      q = query(newsCollection, orderBy("likes", "desc"), limit(limitCount * 2));
     } else if (sortBy === 'created') {
-      // 🌟 [추가] 등록순(createdAt) 정렬 로직
-      q = query(newsCollection, orderBy("createdAt", "desc"), limit(limitCount));
+      q = query(newsCollection, orderBy("createdAt", "desc"), limit(limitCount * 2));
     } else {
-      q = query(newsCollection, orderBy("publishedAt", "desc"), limit(limitCount));
+      q = query(newsCollection, orderBy("publishedAt", "desc"), limit(limitCount * 2));
     }
 
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const all = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    })) as NewsArticle[];
+    })) as (NewsArticle & { status?: string })[];
+
+    // draft/rejected 제외
+    return all
+      .filter(a => !a.status || a.status === 'published')
+      .slice(0, limitCount) as NewsArticle[];
   } catch (error) {
     console.error("Error fetching news: ", error);
     return [];
+  }
+}
+
+// 어드민용: 검토 대기(draft) 자동수집 기사 가져오기
+export async function getDraftNews(): Promise<NewsArticle[]> {
+  try {
+    // where 없이 최근 300건 가져온 뒤 클라이언트에서 필터 (인덱스 불필요)
+    const snap = await getDocs(
+      query(
+        collection(db, "news"),
+        orderBy("createdAt", "desc"),
+        limit(300)
+      )
+    );
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter((a: any) => a.isAuto === true && a.status === 'draft') as NewsArticle[];
+  } catch (error) {
+    console.error("Error fetching draft news:", error);
+    return [];
+  }
+}
+
+// 어드민용: 기사 상태 변경 (승인/거부)
+export async function updateNewsStatus(id: string, status: 'published' | 'rejected') {
+  try {
+    await updateDoc(doc(db, "news", id), { status });
+  } catch (error) {
+    console.error("Error updating news status:", error);
+    throw error;
   }
 }
 
