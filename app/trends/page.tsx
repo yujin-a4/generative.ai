@@ -10,6 +10,7 @@ import {
   PointElement, LineElement, Title, Tooltip, Legend,
 } from "chart.js";
 import TrendBackButton from "@/app/components/TrendBackButton";
+import { trackPageView, trackEvent } from "@/lib/analytics";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -127,12 +128,15 @@ function TrendsContent() {
 
   useEffect(() => {
     getAllReports().then(d => { setAllReports(d); setLoading(false); });
+    // 트렌드 페이지 진입 트래킹
+    trackPageView('/trends', `AI Trend Lab | 기간별 성능 트렌드`);
   }, []);
 
   // 타입 변경 시 카테고리 초기화
   const handleTypeChange = (t: string) => {
     setReportType(t);
     setSelectedCatKey(CATEGORIES_BY_TYPE[t]?.[0]?.key || "");
+    trackEvent('trend_type_change', { type: t });
   };
 
   const cats     = CATEGORIES_BY_TYPE[reportType] || [];

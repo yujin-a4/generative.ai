@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import QueryProvider from "./components/QueryProvider";
 
@@ -32,6 +33,22 @@ export default function RootLayout({
           }}
         />
       </head>
+
+      {/* Google Analytics 4 */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-5T4N6QXR59"
+        strategy="afterInteractive"
+      />
+      <Script id="ga4-init" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-5T4N6QXR59', {
+            send_page_view: false
+          });
+        `}
+      </Script>
       <body className={`${inter.className} flex flex-col min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-white`}>
 
         

@@ -10,6 +10,7 @@ import Dashboard from "@/app/components/Dashboard";
 import LandingScreen from "@/app/components/LandingScreen";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import FeedbackModal from "@/app/components/FeedbackModal";
+import { trackLandingEnter, trackMenuChange, trackFeedbackOpen } from "@/lib/analytics";
 
 function MainContent() {
   const [showLanding, setShowLanding] = useState(true);
@@ -33,12 +34,15 @@ function MainContent() {
   const handleEnter = () => {
     localStorage.setItem('hasSeenLanding', 'true');
     setShowLanding(false);
+    trackLandingEnter();
+    trackMenuChange('dashboard');
   };
 
   // 🌟 [추가] 대시보드에서 보낸 'timeline' 정보를 처리하는 핸들러
   const handleMenuChange = (menu: MenuType, subView?: string) => {
     setActiveMenu(menu);
     window.scrollTo(0, 0);
+    trackMenuChange(menu);
     if (menu === 'news') {
       setNewsInitialView(subView);
     } else {
@@ -96,7 +100,7 @@ function MainContent() {
       {/* 피드백 플로팅 버튼 */}
       {!showLanding && (
         <button
-          onClick={() => setIsFeedbackOpen(true)}
+          onClick={() => { setIsFeedbackOpen(true); trackFeedbackOpen(); }}
           className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 rounded-full shadow-lg border border-gray-200 dark:border-zinc-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 dark:hover:bg-indigo-600 dark:hover:border-indigo-600 transition-all duration-200 group text-sm font-bold hover:-translate-y-0.5 hover:shadow-xl"
           title="오류 제보 또는 건의사항"
         >
