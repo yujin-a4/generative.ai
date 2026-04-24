@@ -132,7 +132,7 @@ export default function ServiceTab() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-5 py-5">
+    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-10 py-5">
       <div className="w-full">
         {/* 헤더 영역 */}
         <div className="mb-6">

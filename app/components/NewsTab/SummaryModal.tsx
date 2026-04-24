@@ -541,7 +541,7 @@ export default function SummaryModal({
                 {/* 7. 다음 달 전망 (월간 전용) */}
                 {type === "monthly" && (summary.watch_next || summary.outlook) && (
                   <section id="sec-next">
-                    <SectionTitle icon="🔭" title={type === "weekly" ? "다음 주 주목 이슈" : "다음 달 전망"} />
+                    <SectionTitle icon="🔭" title="다음 달 전망" />
                     <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/40 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800/40 rounded-2xl p-6">
                       <p className="text-sm text-gray-800 dark:text-indigo-100 leading-relaxed whitespace-pre-line">{summary.watch_next || summary.outlook}</p>
                     </div>

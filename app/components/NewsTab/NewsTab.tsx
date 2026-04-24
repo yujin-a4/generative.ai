@@ -53,7 +53,7 @@ export default function NewsTab({ initialView }: NewsTabProps) {
   };
 
   return (
-    <div className="w-full px-5 py-5">
+    <div className="w-full px-10 py-5">
       
       {/* 1. 헤더 영역 */}
       <div className="flex flex-col gap-4 mb-6 border-b border-gray-200 dark:border-zinc-800 pb-6">
