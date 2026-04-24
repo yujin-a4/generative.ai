@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAllServices, deleteService } from "@/app/actions/serviceActions";
 import ServiceCard from "./ServiceCard";
@@ -8,6 +8,7 @@ import SubmitServiceModal from "./SubmitServiceModal";
 import type { AIService, ServiceCategory } from "@/types/service";
 import { SERVICE_CATEGORIES } from "@/types/service";
 import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 // 검색 유의어 사전
 const SEARCH_SYNONYMS: Record<string, string[]> = {
@@ -24,8 +25,8 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
 };
 
 export default function ServiceTab() {
-  // 🛠️ [수정 1] 기본값을 "ALL"에서 "LLM"으로 변경하고 타입에서 "ALL" 제거
-  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory>("LLM");
+  // 🛠️ 카테고리 선택 상태 ("ALL" | ServiceCategory)
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFree, setFilterFree] = useState(false);
   const [filterKorean, setFilterKorean] = useState(false);
@@ -34,6 +35,16 @@ export default function ServiceTab() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<AIService | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setIsAdmin(user?.email === "yujinkang1008@gmail.com");
+    });
+    return () => unsub();
+  }, []);
 
   const queryClient = useQueryClient();
 
@@ -47,10 +58,25 @@ export default function ServiceTab() {
   const filteredServices = useMemo(() => {
     let filtered = Array.isArray(allServices) ? allServices : [];
 
-    // 🛠️ [수정 2] '전체' 로직 삭제 및 항상 선택된 카테고리로 필터링
-    filtered = filtered.filter((s) => s.category === selectedCategory);
+    // 카테고리 필터 — ALL이면 전체, 아니면 선택된 카테고리만
+    if (selectedCategory !== "ALL") {
+      filtered = filtered.filter((s) => s.category === selectedCategory);
+    } else {
+      // 전체보기: 최신 등록순(최신 → 오래된 것) 정렬
+      filtered = [...filtered].sort((a, b) => {
+        const getMs = (v: any): number => {
+          if (!v) return 0;
+          if (typeof v === "number") return v;
+          if (typeof v === "string") return new Date(v).getTime();
+          if (v.toMillis) return v.toMillis();
+          if (v.seconds) return v.seconds * 1000;
+          return 0;
+        };
+        return getMs(b.createdAt) - getMs(a.createdAt);
+      });
+    }
 
-    // 2. 검색어 필터 (유의어 포함)
+    // 검색어 필터 (유의어 포함)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().replace(/\s+/g, ""); 
       let searchKeywords = [query];
@@ -68,22 +94,22 @@ export default function ServiceTab() {
       });
     }
 
-    // 3. 무료만 보기
+    // 무료만 보기
     if (filterFree) {
       filtered = filtered.filter((s) => s.pricing === "FREE");
     }
 
-    // 4. 한국어 지원
+    // 한국어 지원
     if (filterKorean) {
       filtered = filtered.filter((s) => s.supportsKorean || s.tags?.includes("한국어"));
     }
 
-    // 5. 요즘 뜨는
+    // 요즘 뜨는
     if (filterTrending) {
       filtered = filtered.filter((s) => (s.likes || 0) > 10 || s.isTrending);
     }
 
-    // 6. 즐겨찾기 필터
+    // 즐겨찾기 필터
     if (filterBookmarked) {
       const currentUid = auth.currentUser?.uid;
       if (currentUid) {
@@ -131,29 +157,84 @@ export default function ServiceTab() {
     await refetch();
   };
 
+  const handleEnrichAll = async () => {
+    if (!isAdmin) return;
+    if (!confirm("내용이 비어있는 서비스를 AI로 자동 보강합니다. 서비스 수에 따라 1~3분 소요될 수 있습니다. 계속할까요?")) return;
+    setEnriching(true);
+    setEnrichResult(null);
+    try {
+      const res = await fetch("/api/services/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminEmail: "yujinkang1008@gmail.com" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const s = data.summary;
+        setEnrichResult(`✅ 완료 — 보강: ${s.enriched}개, 스킵: ${s.skipped}개, 오류: ${s.errors}개`);
+        await queryClient.invalidateQueries({ queryKey: ["aiServices"] });
+        await refetch();
+      } else {
+        setEnrichResult(`❌ 실패: ${data.error}`);
+      }
+    } catch (e: any) {
+      setEnrichResult(`❌ 오류: ${e.message}`);
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans px-10 py-5">
       <div className="w-full">
         {/* 헤더 영역 */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI 서비스</h1>
+          {/* 관리자 전용 AI 보강 버튼 */}
+          {isAdmin && (
+            <div className="flex items-center gap-3">
+              {enrichResult && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">{enrichResult}</span>
+              )}
+              <button
+                onClick={handleEnrichAll}
+                disabled={enriching}
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-full text-sm font-bold shadow transition-all"
+              >
+                {enriching ? (
+                  <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />보강 중...</>
+                ) : (
+                  <>🤖 AI 일괄 보강</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 카테고리 필터 */}
         <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 mb-4 border border-gray-200 dark:border-zinc-800 shadow-sm">
           <div className="flex flex-wrap gap-2">
-            {/* 🛠️ [수정 3] '전체' 버튼 삭제됨 */}
+            {/* 전체 버튼 */}
+            <button
+              onClick={() => setSelectedCategory("ALL")}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                selectedCategory === "ALL"
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow-md"
+                  : "bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              전체
+            </button>
             {Object.entries(SERVICE_CATEGORIES).map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setSelectedCategory(key as ServiceCategory)}
+                onClick={() => setSelectedCategory(key)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   selectedCategory === key
                     ? "bg-black text-white dark:bg-white dark:text-black shadow-md"
                     : "bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700"
                 }`}
               >
-                {/* 🛠️ [수정 4] LLM인 경우 강제로 'LLM'으로 표시 (types 파일 미수정 대비) */}
                 {key === "LLM" ? "LLM" : label}
               </button>
             ))}
@@ -235,6 +316,14 @@ export default function ServiceTab() {
         </div>
 
         {/* 서비스 목록 */}
+        {/* 전체보기 안내 */}
+        {selectedCategory === "ALL" && !isLoading && (
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              전체 <span className="font-bold text-gray-900 dark:text-white">{filteredServices.length}</span>개 서비스 · 최신 등록순
+            </span>
+          </div>
+        )}
         {isLoading ? (
           <div className="text-center py-20">
             <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
