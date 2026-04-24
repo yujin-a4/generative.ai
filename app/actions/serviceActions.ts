@@ -129,7 +129,7 @@ export async function analyzeService(url: string) {
     } catch (e) { console.log("메타데이터 추출 실패"); }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.0-flash",
       generationConfig: { responseMimeType: "application/json" },
     });
 
