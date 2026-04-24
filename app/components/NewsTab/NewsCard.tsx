@@ -138,7 +138,9 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
 
   const isMyPost = currentUserId && news.authorId === currentUserId;
   const canDelete = isMyPost || isAdmin;
-  const canEdit = isMyPost;
+  const canEdit = isMyPost || isAdmin;   // 관리자: 모든 기사 수정 가능
+  // 관리자가 남의 글을 조작하는 경우 (버튼 스타일 구분용)
+  const isAdminOverride = isAdmin && !isMyPost;
   
   const titleSizeClass = isTimelineView
     ? "text-base line-clamp-3" 
@@ -161,10 +163,30 @@ export default function NewsCard({ news, onClick, onEdit, refreshList, hideSumma
 
       <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 pl-2 z-10">
         {canEdit && (
-          <button onClick={handleEditClick} className="p-1 bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600 rounded text-xs font-bold">수정</button>
+          <button
+            onClick={handleEditClick}
+            className={`p-1 rounded text-xs font-bold ${
+              isAdminOverride
+                ? "bg-amber-50 hover:bg-amber-100 text-amber-600 hover:text-amber-700 border border-amber-200"
+                : "bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-600"
+            }`}
+            title={isAdminOverride ? "관리자 권한으로 수정" : "수정"}
+          >
+            {isAdminOverride ? "🛡️ 수정" : "수정"}
+          </button>
         )}
         {canDelete && (
-          <button onClick={handleDelete} className="p-1 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded text-xs font-bold">삭제</button>
+          <button
+            onClick={handleDelete}
+            className={`p-1 rounded text-xs font-bold ${
+              isAdminOverride
+                ? "bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200"
+                : "bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600"
+            }`}
+            title={isAdminOverride ? "관리자 권한으로 삭제" : "삭제"}
+          >
+            {isAdminOverride ? "🛡️ 삭제" : "삭제"}
+          </button>
         )}
       </div>
 

@@ -176,15 +176,28 @@ export default function ReportTab() {
         {/* TOP 3 순위 리스트 — test_benchmarks 또는 vote_rankings.overall 둘 다 지원 */}
         {(() => {
           const reportType = (report.analysis_result?.report_type || "").toUpperCase();
-          // TTS: vote_rankings.overall (Elo)
-          // STT: test_benchmarks.total_ranking (WER)
-          // 그 외: test_benchmarks.total_ranking
           const isTTS = reportType === "TTS";
           const isSTT = reportType === "STT";
 
-          const topItems: any[] = isTTS
-            ? (report.analysis_result?.raw_data?.vote_rankings?.overall?.slice(0, 3) || [])
-            : (report.analysis_result?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 3) || []);
+          // 우선순위: TTS → vote_rankings.overall, 나머지 → test_benchmarks.total_ranking → vote_rankings.overall → sub_categories 첫 번째 항목
+          let topItems: any[] = [];
+          if (isTTS) {
+            topItems = report.analysis_result?.raw_data?.vote_rankings?.overall?.slice(0, 3) || [];
+          } else {
+            topItems = report.analysis_result?.raw_data?.test_benchmarks?.total_ranking?.slice(0, 3) || [];
+          }
+          // fallback: vote_rankings.overall
+          if (topItems.length === 0) {
+            topItems = report.analysis_result?.raw_data?.vote_rankings?.overall?.slice(0, 3) || [];
+          }
+          // fallback: vote_rankings.sub_categories 첫 번째 카테고리 items
+          if (topItems.length === 0) {
+            const subCats = report.analysis_result?.raw_data?.vote_rankings?.sub_categories || {};
+            const firstCatKey = Object.keys(subCats)[0];
+            if (firstCatKey) {
+              topItems = (subCats[firstCatKey]?.items || []).slice(0, 3);
+            }
+          }
 
           if (topItems.length === 0) {
             return <p className="text-sm text-gray-400 italic text-center py-4 flex-1">순위 정보를 불러오는 중...</p>;
@@ -213,7 +226,8 @@ export default function ReportTab() {
                         {idx + 1}
                       </span>
                       <span className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">
-                        {item.model?.split('/').pop()?.replace(/-/g, ' ')}
+                        {(item.model || item.bestModel || item.org || "Unknown")
+                          .split('/').pop()?.replace(/-/g, ' ')}
                       </span>
                     </div>
                     <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${

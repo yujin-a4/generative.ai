@@ -21,7 +21,7 @@ function MainContent() {
   // 🌟 [추가] 뉴스 탭의 초기 뷰를 결정하는 상태
   const [newsInitialView, setNewsInitialView] = useState<string | undefined>(undefined);
 
-  // 로컬 스토리지에서 랜딩 화면 표시 여부 확인
+  // 로컬 스토리지에서 랜딩 화면 표시 여부 확인 + URL 쿼리스트링으로 초기 탭 설정
   useEffect(() => {
     const hasSeenLanding = localStorage.getItem('hasSeenLanding');
     if (hasSeenLanding === 'true') {
@@ -29,6 +29,20 @@ function MainContent() {
     }
     // 페이지 초기 로드 시 항상 최상단으로
     window.scrollTo(0, 0);
+
+    // ── URL 쿼리스트링(tab)으로 초기 탭 설정 ──
+    // 예: /?tab=reports  |  /?tab=reports&sub=llm  |  /?tab=news
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const tabMap: Record<string, MenuType> = {
+      reports:   'reports',
+      news:      'news',
+      services:  'services',
+      dashboard: 'dashboard',
+    };
+    if (tabParam && tabMap[tabParam]) {
+      setActiveMenu(tabMap[tabParam]);
+    }
   }, []);
 
   const handleEnter = () => {

@@ -20,3 +20,65 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── PDF / 인쇄 전용 스타일 ── */
+@media print {
+  /* 인쇄 시 숨길 요소 */
+  nav,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* 본문 여백·색상 초기화 */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 페이지 여백 */
+  @page {
+    margin: 15mm 10mm;
+    size: A4;
+  }
+
+  /* 카드/섹션이 페이지 중간에 잘리지 않도록 */
+  section,
+  .report-section,
+  article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 배경색·그림자 인쇄 허용 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* ── Chart.js canvas → img 스냅샷 처리 ── */
+  /* JS에서 canvas를 숨기고 img를 앞에 삽입하므로,
+     혹시 canvas가 그대로 남아 있으면 숨김 처리 */
+  canvas:not(.keep-print) {
+    display: none !important;
+  }
+
+  /* 스냅샷 img는 항상 표시 */
+  img.print-canvas-snapshot {
+    display: block !important;
+    max-width: 100% !important;
+  }
+
+  /* 차트 컨테이너 overflow 해제 (잘림 방지) */
+  [class*="h-["] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

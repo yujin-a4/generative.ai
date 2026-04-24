@@ -59,8 +59,9 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
     return () => unsubscribe();
   }, []);
 
-  const { data: allNews } = useQuery({ queryKey: ["recentNews", "dashboard"], queryFn: () => getRecentNews(1000) });
-  const { data: recentNews } = useQuery({ queryKey: ["recentNews", "dashboard-preview"], queryFn: () => getRecentNews(5) });
+  const { data: allNews, isLoading: isNewsLoading } = useQuery({ queryKey: ["recentNews", "dashboard"], queryFn: () => getRecentNews(1000) });
+  // recentNews: allNews에서 최신 5건 slice (별도 fetch 불필요)
+  const recentNews = allNews ? (allNews as any[]).slice(0, 5) : undefined;
   const { data: allReports } = useQuery({ queryKey: ["recentReports", "dashboard"], queryFn: () => getAllReports() });
   const { data: weeklySummaries } = useQuery({ queryKey: ["weeklySummaries", "dashboard"], queryFn: () => getWeeklySummaries(false) });
   const { data: monthlySummaries } = useQuery({ queryKey: ["monthlySummaries", "dashboard"], queryFn: () => getMonthlySummaries(false) });
@@ -292,34 +293,95 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800"><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 뉴스</h2><button onClick={() => onMenuChange?.('news')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button></div>{recentNews && recentNews.length > 0 ? (<div className="space-y-4">{recentNews.slice(0, 5).map((news: any) => (<div key={news.id} onClick={() => handleNewsClick(news)} className="p-4 rounded-lg border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"><h3 className="font-semibold text-gray-900 dark:text-white mb-1">{news.title}</h3><p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{news.shortSummary || news.summary}</p><div className="flex items-center gap-2 mt-2 text-xs text-gray-400"><span>{new Date(news.publishedAt?.toDate?.() || news.createdAt || Date.now()).toLocaleDateString('ko-KR')}</span>{news.category && <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-700 rounded text-gray-600 dark:text-gray-300">{news.category}</span>}</div></div>))}</div>) : (<div className="text-center py-10 text-gray-400">뉴스가 없습니다.</div>)}</div>
+           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800"><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 뉴스</h2><button onClick={() => onMenuChange?.('news')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button></div>{isNewsLoading ? (<div className="space-y-3">{[1,2,3,4,5].map(i => (<div key={i} className="p-4 rounded-lg border border-gray-100 dark:border-zinc-800 animate-pulse"><div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-3/4 mb-2" /><div className="h-3 bg-gray-100 dark:bg-zinc-800 rounded w-full mb-2" /><div className="h-3 bg-gray-100 dark:bg-zinc-800 rounded w-1/3" /></div>))}</div>) : recentNews && recentNews.length > 0 ? (<div className="space-y-4">{recentNews.slice(0, 5).map((news: any) => (<div key={news.id} onClick={() => handleNewsClick(news)} className="p-4 rounded-lg border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"><h3 className="font-semibold text-gray-900 dark:text-white mb-1">{news.title}</h3><p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{news.shortSummary || news.summary}</p><div className="flex items-center gap-2 mt-2 text-xs text-gray-400"><span>{new Date(news.publishedAt?.toDate?.() || news.createdAt || Date.now()).toLocaleDateString('ko-KR')}</span>{news.category && <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-700 rounded text-gray-600 dark:text-gray-300">{news.category}</span>}</div></div>))}</div>) : (<div className="text-center py-10 text-gray-400">등록된 뉴스가 없습니다.</div>)}</div>
            
-           {/* 🌟 [수정] 최근 리포트: 날짜순 정렬 및 클릭 이벤트 연결 */}
-           <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-zinc-800">
-             <div className="flex items-center justify-between mb-4">
+           {/* ── 최근 리포트: Hero + List ── */}
+           <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 flex flex-col">
+             <div className="flex items-center justify-between px-6 pt-5 pb-4">
                <h2 className="text-xl font-bold text-gray-900 dark:text-white">최근 리포트</h2>
-               {/* 🌟 [수정] 더보기 클릭 시 뉴스탭의 '타임라인'으로 이동 신호 전달 */}
                <button onClick={() => onMenuChange?.('news', 'timeline')} className="text-gray-400 hover:text-blue-500 text-xs transition-colors font-medium">더보기</button>
              </div>
-             <div className="space-y-4">
-               {sortedReports.length > 0 ? sortedReports.map((report: any) => (
-                 <div 
-                   key={report.id} 
-                   onClick={() => handleReportClick(report)}
-                   className={`p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${
-                     report.reportType === 'monthly' 
-                     ? "border-purple-100 dark:border-purple-900/30 bg-purple-50 dark:bg-purple-900/10" 
-                     : "border-blue-100 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/10"
-                   }`}
-                 >
-                   <div className="flex items-center gap-2 mb-2">
-                     <span className="text-lg">{report.reportType === 'monthly' ? "📅" : "📊"}</span>
-                     <span className="font-bold text-gray-900 dark:text-white">{report.displayLabel}</span>
-                   </div>
-                   <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{report.summary}</p>
-                 </div>
-               )) : (<div className="text-center py-10 text-gray-400">아직 리포트가 없습니다.</div>)}
-             </div>
+
+             {sortedReports.length === 0 ? (
+               <div className="text-center py-10 text-gray-400">아직 리포트가 없습니다.</div>
+             ) : (
+               <div className="flex flex-col gap-2 px-4 pb-4">
+
+                 {/* ── Hero: 최신 리포트 ── */}
+                 {(() => {
+                   const hero = sortedReports[0];
+                   const isMonthly = hero.reportType === 'monthly';
+                   const accentColor = isMonthly ? 'bg-violet-500' : 'bg-indigo-500';
+                   const tagColor = isMonthly
+                     ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
+                     : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400';
+                   const hoverBorder = isMonthly
+                     ? 'hover:border-violet-200 dark:hover:border-violet-800/50'
+                     : 'hover:border-indigo-200 dark:hover:border-indigo-800/50';
+                   const ctaColor = isMonthly
+                     ? 'text-violet-600 dark:text-violet-400'
+                     : 'text-indigo-600 dark:text-indigo-400';
+
+                   return (
+                     <div
+                       onClick={() => handleReportClick(hero)}
+                       className={`group cursor-pointer rounded-xl border border-gray-100 dark:border-zinc-800 ${hoverBorder} hover:shadow-md transition-all overflow-hidden`}
+                     >
+                       {/* 상단 컬러 바 */}
+                       <div className={`h-1 w-full ${accentColor}`} />
+                       <div className="p-4">
+                         {/* 배지 + NEW */}
+                         <div className="flex items-center gap-2 mb-2.5">
+                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${tagColor}`}>
+                             {isMonthly ? '📅 월간' : '📊 주간'}
+                           </span>
+                           <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 tracking-wider">최신</span>
+                         </div>
+                         {/* 기간 */}
+                         <h3 className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight mb-1.5">
+                           {hero.displayLabel}
+                         </h3>
+                         {/* 요약 */}
+                         <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-3">
+                           {hero.summary || '클릭해서 리포트 상세 내용을 확인하세요.'}
+                         </p>
+                         {/* CTA */}
+                         <div className={`flex items-center gap-1 text-xs font-bold ${ctaColor} group-hover:gap-2 transition-all`}>
+                           <span>리포트 열기</span>
+                           <span className="transform group-hover:translate-x-0.5 transition-transform">→</span>
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })()}
+
+                 {/* ── 나머지 리포트: 컴팩트 리스트 ── */}
+                 {sortedReports.slice(1, 4).map((report: any) => {
+                   const isMonthly = report.reportType === 'monthly';
+                   return (
+                     <div
+                       key={report.id}
+                       onClick={() => handleReportClick(report)}
+                       className="group cursor-pointer flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:border-gray-200 dark:hover:border-zinc-700 transition-all"
+                     >
+                       <span className="text-base flex-shrink-0">{isMonthly ? '📅' : '📊'}</span>
+                       <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex-1 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                         {report.displayLabel}
+                       </span>
+                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                         isMonthly
+                           ? 'text-violet-500 bg-violet-50 dark:bg-violet-900/20'
+                           : 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                       }`}>
+                         {isMonthly ? '월간' : '주간'}
+                       </span>
+                       <span className="text-gray-300 dark:text-zinc-600 text-xs group-hover:text-indigo-400 transition-colors flex-shrink-0">→</span>
+                     </div>
+                   );
+                 })}
+
+               </div>
+             )}
            </div>
         </div>
       </div>
