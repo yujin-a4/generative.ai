@@ -110,13 +110,22 @@ export async function getAiServices() {
 // 3. URL 분석
 export async function analyzeService(url: string) {
   try {
+    // 페이지 메타데이터 추출 시도
     let pageContent = "";
     try {
       const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       const html = await response.text();
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const metaDescMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
-      pageContent = `Title: ${titleMatch?.[1] || "Unknown"}, Desc: ${metaDescMatch?.[1] || "Unknown"}`;
+      const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
+      const ogDescMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+      const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]*)"/i);
+
+      pageContent = [
+        `Title: ${titleMatch?.[1] || ogTitleMatch?.[1] || "Unknown"}`,
+        `Description: ${metaDescMatch?.[1] || ogDescMatch?.[1] || "Unknown"}`,
+        ogImageMatch?.[1] ? `OG Image: ${ogImageMatch[1]}` : "",
+      ].filter(Boolean).join("\n");
     } catch (e) { console.log("메타데이터 추출 실패"); }
 
     const model = genAI.getGenerativeModel({
@@ -125,24 +134,37 @@ export async function analyzeService(url: string) {
     });
 
     const prompt = `
-      Analyze this URL: ${url}
-      Context: ${pageContent}
-      
-      Return JSON:
-      {
-        "name": "Service Name",
-        "category": "One of [LLM, IMAGE, VIDEO, TTS, STT, CODING, UIUX, PRESENTATION, RESEARCH, WORKSPACE, AGENT, OTHER]",
-        "description": "한글로 100자 이내 요약",
-        "pricing": "One of [FREE, PAID, FREEMIUM]",
-        "supportsKorean": true/false,
-        "isTrending": true/false,
-        "tags": ["태그1", "태그2", "태그3"]
-      }
+당신은 AI 서비스 분석 전문가입니다. 다음 URL의 AI 서비스를 분석하여 JSON을 반환하세요.
 
-      [Important Rules]
-      1. "tags": Extract 3-5 key features as keywords. **MUST BE IN KOREAN.** (e.g., "이미지생성", "무료", "고화질")
-      2. "description": Must be in Korean.
-      3. "pricing": Must be strictly "FREE", "PAID", or "FREEMIUM".
+URL: ${url}
+페이지 정보:
+${pageContent}
+
+반환할 JSON 형식:
+{
+  "name": "서비스 공식 이름 (영문 유지)",
+  "category": "LLM | IMAGE | VIDEO | TTS | STT | CODING | UIUX | PRESENTATION | RESEARCH | WORKSPACE | AGENT | OTHER 중 하나",
+  "description": "핵심 기능을 담은 한글 한 줄 소개 (70자 이내)",
+  "longDescription": "서비스의 특징, 강점, 활용 분야를 포함한 한글 상세 소개 (200~300자)",
+  "features": ["핵심 기능 1 (한글, 15자 이내)", "핵심 기능 2", "핵심 기능 3", "핵심 기능 4", "핵심 기능 5"],
+  "pros": ["장점 1 (한글, 20자 이내)", "장점 2", "장점 3"],
+  "cons": ["단점 또는 제한사항 1 (한글, 20자 이내)", "단점 2"],
+  "targetUser": ["추천 대상 1 (예: 개발자, 마케터, 디자이너 등)", "추천 대상 2", "추천 대상 3"],
+  "pricing": "FREE | PAID | FREEMIUM 중 하나",
+  "supportsKorean": true 또는 false,
+  "isTrending": true 또는 false,
+  "tags": ["태그1", "태그2", "태그3", "태그4", "태그5"]
+}
+
+[반드시 지킬 규칙]
+1. description, longDescription, features, pros, cons, targetUser, tags: 반드시 한글로 작성
+2. pricing: 반드시 "FREE", "PAID", "FREEMIUM" 중 정확히 하나
+3. features: 정확히 3~5개
+4. pros: 정확히 2~4개
+5. cons: 정확히 1~3개
+6. targetUser: 정확히 2~4개
+7. tags: 정확히 3~6개의 핵심 키워드
+8. isTrending: 최근 1~2년 내 주목받는 서비스면 true
     `;
 
     const result = await model.generateContent(prompt);

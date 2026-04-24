@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { toggleLikeService, toggleBookmarkService } from "@/app/actions/serviceActions";
 import { useQueryClient } from "@tanstack/react-query";
+import ServiceDetailModal from "./ServiceDetailModal";
 
 interface ServiceCardProps {
   service: AIService;
@@ -17,6 +18,8 @@ export default function ServiceCard({ service, onEdit, onDelete }: ServiceCardPr
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const [selectedService, setSelectedService] = useState<AIService | null>(null);
 
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(service.likes || 0);
@@ -41,7 +44,7 @@ export default function ServiceCard({ service, onEdit, onDelete }: ServiceCardPr
 
   
   const handleCardClick = () => {
-    if (service.url) window.open(service.url, "_blank");
+    setSelectedService(service);
   };
 
   const handleLike = async (e: React.MouseEvent) => {
@@ -99,6 +102,7 @@ const isOwner = currentUser && service.authorId === currentUser.uid;
   const categoryLabel = SERVICE_CATEGORIES[service.category] || service.category;
 
   return (
+    <>
     <div 
       onClick={handleCardClick}
       className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-800 p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col relative"
@@ -200,5 +204,12 @@ const isOwner = currentUser && service.authorId === currentUser.uid;
         </div>
       </div>
     </div>
+
+    {/* 서비스 상세 모달 */}
+    <ServiceDetailModal
+      service={selectedService}
+      onClose={() => setSelectedService(null)}
+    />
+    </>
   );
 }
