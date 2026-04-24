@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       source: string;
       pubDate: string;
       autoSource: string;
+      rssSummary: string;
     }> = [];
 
     // 최근 14일 기준 (7일이면 너무 좁음)
