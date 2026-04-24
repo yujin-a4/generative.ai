@@ -109,6 +109,16 @@ export async function getAiServices() {
 
 // 3. URL 분석
 export async function analyzeService(url: string) {
+  // 서버 측 URL 유효성 검사
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { success: false, error: "http/https URL만 분석할 수 있습니다." };
+    }
+  } catch {
+    return { success: false, error: "올바른 URL 형식이 아닙니다." };
+  }
+
   try {
     // 페이지 메타데이터 추출 시도
     let pageContent = "";
