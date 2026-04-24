@@ -63,6 +63,14 @@ export default function ReportTab() {
     setFilteredReports(filtered);
   }, [activeCategory, allReports]);
 
+  // 카테고리 변경 + URL sub 파라미터 동기화
+  const handleCategoryChange = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('sub', categoryId);
+    window.history.replaceState({}, '', url.toString());
+  };
+
   const handleDeleteReport = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -107,7 +115,7 @@ export default function ReportTab() {
           {REPORT_CATEGORIES.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => handleCategoryChange(cat.id)}
               className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2
                 ${activeCategory === cat.id
                     ? "bg-indigo-600 text-white shadow-md"

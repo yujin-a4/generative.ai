@@ -57,6 +57,14 @@ function MainContent() {
     setActiveMenu(menu);
     window.scrollTo(0, 0);
     trackMenuChange(menu);
+
+    // ── 탭 변경 시 URL 동기화 (새로고침해도 현재 탭 유지) ──
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', menu);
+    // sub 파라미터 초기화 (reports → sub는 ReportTab이 관리)
+    if (menu !== 'reports') url.searchParams.delete('sub');
+    window.history.replaceState({}, '', url.toString());
+
     if (menu === 'news') {
       setNewsInitialView(subView);
     } else {

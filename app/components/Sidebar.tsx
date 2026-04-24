@@ -89,12 +89,6 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed = false,
         })}
       </nav>
 
-      {!isCollapsed && (
-        <div className="p-6 mb-2 border-t border-gray-200 dark:border-zinc-800">
-          <p className="text-sm font-bold text-gray-500 dark:text-gray-400">YBM AI Lab</p>
-          <p className="text-xs text-gray-300 dark:text-gray-500 mt-0.5">Yujin Kang</p>
-        </div>
-      )}
     </div>
   );
 }

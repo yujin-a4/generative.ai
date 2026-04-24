@@ -321,6 +321,22 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
                    const ctaColor = isMonthly
                      ? 'text-violet-600 dark:text-violet-400'
                      : 'text-indigo-600 dark:text-indigo-400';
+                   const dotColor = isMonthly ? 'bg-violet-400' : 'bg-indigo-400';
+
+                   // 발행일 포맷
+                   const createdAt = hero.created_at;
+                   const dateStr = createdAt
+                     ? (createdAt.toMillis
+                         ? new Date(createdAt.toMillis()).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+                         : new Date(createdAt.seconds * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }))
+                     : '';
+
+                   // 핵심 인사이트 항목
+                   const summaryItems: string[] = Array.isArray(hero.key_insights)
+                     ? hero.key_insights.slice(0, 3)
+                     : Array.isArray(hero.summary_items)
+                     ? hero.summary_items.slice(0, 3)
+                     : [];
 
                    return (
                      <div
@@ -329,26 +345,38 @@ export default function Dashboard({ onMenuChange }: DashboardProps) {
                      >
                        {/* 상단 컬러 바 */}
                        <div className={`h-1 w-full ${accentColor}`} />
-                       <div className="p-4">
-                         {/* 배지 + NEW */}
-                         <div className="flex items-center gap-2 mb-2.5">
-                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${tagColor}`}>
-                             {isMonthly ? '📅 월간' : '📊 주간'}
+                       <div className="px-5 py-4 flex flex-col gap-4">
+                         <div className="flex items-center justify-between">
+                           <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${tagColor}`}>
+                             {isMonthly ? '📅 월간' : '📊 쳠간'}
                            </span>
-                           <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 tracking-wider">최신</span>
+                           {dateStr && (
+                             <span className="text-[11px] text-gray-400 dark:text-zinc-500">{dateStr}</span>
+                           )}
                          </div>
-                         {/* 기간 */}
-                         <h3 className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight mb-1.5">
-                           {hero.displayLabel}
-                         </h3>
-                         {/* 요약 */}
-                         <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed mb-3">
-                           {hero.summary || '클릭해서 리포트 상세 내용을 확인하세요.'}
-                         </p>
-                         {/* CTA */}
-                         <div className={`flex items-center gap-1 text-xs font-bold ${ctaColor} group-hover:gap-2 transition-all`}>
-                           <span>리포트 열기</span>
-                           <span className="transform group-hover:translate-x-0.5 transition-transform">→</span>
+                         <div>
+                           <h3 className="text-xl font-black text-gray-900 dark:text-white leading-tight mb-1">
+                             {hero.displayLabel}
+                           </h3>
+                           <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-3">
+                             {hero.summary || '클릭해서 리포트 상세 내용을 확인하세요.'}
+                           </p>
+                         </div>
+                         {Array.isArray(hero.key_trends) && hero.key_trends.length > 0 && (
+                           <div className="space-y-2 pt-1 border-t border-gray-100 dark:border-zinc-800">
+                             {hero.key_trends.slice(0, 2).map((t: any, i: number) => (
+                               <div key={i} className="flex items-start gap-2">
+                                 <span className={`flex-shrink-0 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center mt-0.5 ${isMonthly ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>{i + 1}</span>
+                                 <div className="min-w-0">
+                                   <p className="text-xs font-semibold text-gray-700 dark:text-zinc-300 truncate">{t.keyword}</p>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                         <div className={`flex items-center gap-1.5 text-xs font-bold ${ctaColor} group-hover:gap-2.5 transition-all pt-1 border-t border-gray-100 dark:border-zinc-800`}>
+                           <span>리포트 전체 보기</span>
+                           <span className="transform group-hover:translate-x-1 transition-transform">→</span>
                          </div>
                        </div>
                      </div>
