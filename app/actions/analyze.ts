@@ -209,45 +209,80 @@ ${combinedText}
     `;
 
   // ══════════════════════════════════════════
-  //  IMAGE 프롬프트
+  //  IMAGE 프롬프트 — LMArena 10카테고리 + AA 속도·가격
   // ══════════════════════════════════════════
   } else if (type === 'IMAGE') {
     prompt = `
 너는 '이미지 생성 AI 벤치마크 파서'이다.
-입력 데이터는 LMSYS Arena Text-to-Image 및 Image Edit 리더보드 표이다.
+입력 데이터는 최대 11개의 Source로 구분되어 있다.
 
-[소스 매핑]
-- Source 1 (Text-to-Image) → vote_rankings.sub_categories.text_to_image
-- Source 2 (Image Edit)    → vote_rankings.sub_categories.image_edit
+[소스 매핑 — 절대 규칙]
+- Source 1  (LMArena T2I Overall)       → vote_rankings.overall (Top 5) + vote_rankings.sub_categories.text_to_image (Top 10)
+- Source 2  (LMArena T2I Product)       → vote_rankings.sub_categories.text_to_image_product
+- Source 3  (LMArena T2I 3D)            → vote_rankings.sub_categories.text_to_image_3d
+- Source 4  (LMArena T2I Cartoon)       → vote_rankings.sub_categories.text_to_image_cartoon
+- Source 5  (LMArena T2I Photo)         → vote_rankings.sub_categories.text_to_image_photo
+- Source 6  (LMArena T2I Art)           → vote_rankings.sub_categories.text_to_image_art
+- Source 7  (LMArena T2I Portrait)      → vote_rankings.sub_categories.text_to_image_portrait
+- Source 8  (LMArena T2I Text)          → vote_rankings.sub_categories.text_to_image_text
+- Source 9  (LMArena IE Single)         → vote_rankings.sub_categories.image_edit_single
+- Source 10 (LMArena IE Multi)          → vote_rankings.sub_categories.image_edit_multi
+- Source 11 (Artificial Analysis, 선택) → test_benchmarks.sub_categories.speed + test_benchmarks.sub_categories.price
 
-[규칙 1: 파싱]
-- 각 표에서 Model명, Elo Score(보통 900~1500 사이), Organization을 추출.
-- Elo 기준 내림차순 Top 10 추출.
-- vote_rankings.overall: 두 카테고리 전체에서 Elo 1위 모델 기준으로 Top 5를 구성.
+[규칙 1: LMArena 파싱 (Source 1~10)]
+- 각 소스는 Rank 기준으로 정렬된 표다. 위에서 아래 순서로 추출.
+- 각 행에서 Model명, Elo Score(보통 900~1500 사이), Organization을 추출.
+- 각 소스별 Top 10 추출.
+- "(없음)" 이거나 빈 소스는 빈 배열 []로 처리.
+- Source 1의 Top 5를 vote_rankings.overall에도 동일하게 넣어라.
 
-[규칙 2: org 필드 — 반드시 아래 목록에서 선택]
-허용 값: "OpenAI" | "Google" | "Midjourney" | "Adobe" | "Stability AI" | "Flux" | "ByteDance" | "Kling" | "Others"
+[규칙 2: Artificial Analysis 파싱 (Source 11)]
+- Source 11이 "(없음)"이거나 없으면 speed, price 모두 빈 배열 []로 처리.
+- Generation Time (초/이미지): 오름차순(낮은 순, 빠를수록 좋음) Top 10 → sub_categories.speed.items (score 필드에 숫자)
+- Price ($/1,000장): 오름차순(낮은 순, 저렴할수록 좋음) Top 10 → sub_categories.price.items (score 필드에 숫자)
+- 각 comment: 해당 지표 1위 모델과 수치를 언급한 한글 1문장.
+
+[규칙 3: org 필드 — 반드시 아래 목록에서 정확히 선택]
+허용 값: "OpenAI" | "Google" | "Black Forest Labs" | "ByteDance" | "Ideogram" | "Recraft" | "Adobe" | "Midjourney" | "Stability AI" | "xAI" | "Others"
 매핑 힌트:
-- DALL-E, GPT-image → "OpenAI"
-- Imagen, Gemini-image → "Google"
+- DALL-E, GPT-image, GPT Image, gpt-image → "OpenAI"
+- Imagen, Gemini-image, Nano Banana, gemini → "Google"
 - Firefly → "Adobe"
-- FLUX, Black Forest Labs → "Flux"
+- FLUX, Black Forest Labs → "Black Forest Labs"
 - Seedream → "ByteDance"
+- Ideogram → "Ideogram"
+- Recraft → "Recraft"
+- Stable Diffusion, SDXL → "Stability AI"
+- Grok, grok-imagine → "xAI"
 
-[규칙 3: comment 및 summary_insights]
-- comment: 각 카테고리 한글 1문장 분석.
-- summary_insights: 정확히 5문장, 구체적 수치 포함.
+[규칙 4: comment 및 summary_insights]
+- 각 sub_categories의 comment: 해당 카테고리 1위 모델과 Elo를 언급한 한글 1문장.
+- summary_insights: 정확히 5문장. 구체적 모델명과 Elo/수치 포함.
 
-[출력 JSON]
+[출력 JSON — 이 형식 외의 최상위 필드를 추가하지 말 것]
 {
   "report_type": "IMAGE",
   "raw_data": {
-    "test_benchmarks": { "total_ranking": [], "sub_categories": {} },
-    "vote_rankings": {
-      "overall": [ {"rank":1, "model":"...", "elo":1250, "org":"Midjourney"}, ... ],
+    "test_benchmarks": {
+      "total_ranking": [],
       "sub_categories": {
-        "text_to_image": { "items": [ {"rank":1, "model":"...", "elo":1250, "org":"Midjourney"} ], "comment": "" },
-        "image_edit":    { "items": [], "comment": "" }
+        "speed": { "items": [ {"rank":1, "model":"...", "score":3.2, "org":"..."} ], "comment": "..." },
+        "price": { "items": [ {"rank":1, "model":"...", "score":0.04, "org":"..."} ], "comment": "..." }
+      }
+    },
+    "vote_rankings": {
+      "overall": [ {"rank":1, "model":"GPT Image 2 (high)", "elo":1332, "org":"OpenAI"}, ... ],
+      "sub_categories": {
+        "text_to_image":          { "items": [ {"rank":1, "model":"...", "elo":1332, "org":"OpenAI"} ], "comment": "..." },
+        "text_to_image_product":  { "items": [], "comment": "" },
+        "text_to_image_3d":       { "items": [], "comment": "" },
+        "text_to_image_cartoon":  { "items": [], "comment": "" },
+        "text_to_image_photo":    { "items": [], "comment": "" },
+        "text_to_image_art":      { "items": [], "comment": "" },
+        "text_to_image_portrait": { "items": [], "comment": "" },
+        "text_to_image_text":     { "items": [], "comment": "" },
+        "image_edit_single":      { "items": [], "comment": "" },
+        "image_edit_multi":       { "items": [], "comment": "" }
       }
     }
   },
@@ -259,90 +294,89 @@ ${combinedText}
     `;
 
   // ══════════════════════════════════════════
-  //  VIDEO 프롬프트
-  //  Fix 3: complex_landscape 검증 + 수정 행동 명시
-  //  Fix 4: vote_rankings.overall 빈 배열 (코드에서 계산)
-  //  Fix 6: org enum 목록 추가
+  //  VIDEO 프롬프트 — VBench 2.0 + LMArena 3종 + AA
   // ══════════════════════════════════════════
   } else if (type === 'VIDEO') {
     prompt = `
 너는 '영상 생성 AI 벤치마크 파서'이다.
-입력 데이터는 3개의 Source로 구분되어 있다.
+입력 데이터는 최대 5개의 Source로 구분되어 있다.
 
-[소스 매핑]
-- Source 1 (VBench)            → test_benchmarks 섹션 전체
-- Source 2 (Text-to-Video)     → vote_rankings.sub_categories.text_to_video
-- Source 3 (Image-to-Video)    → vote_rankings.sub_categories.image_to_video
+[소스 매핑 — 절대 규칙]
+- Source 1 (VBench 2.0, 정량)          → test_benchmarks.total_ranking + sub_categories.{8항목}
+- Source 2 (LMArena T2V, 정성)       → vote_rankings.sub_categories.text_to_video
+- Source 3 (LMArena I2V, 정성)       → vote_rankings.sub_categories.image_to_video
+- Source 4 (LMArena Video Edit, 정성) → vote_rankings.sub_categories.video_edit
+- Source 5 (Artificial Analysis, 선택) → test_benchmarks.aa_speed + test_benchmarks.aa_price
 
 [규칙 1: VBench (Source 1) 정밀 파싱]
-- 첫 행(헤더)의 컬럼명을 정확히 읽어라. 컬럼 번호(위치)에 절대 의존하지 말라.
 - 헤더명 "Total Score" 컬럼 기준 내림차순 Top 10 → total_ranking
-- 아래 8개 헤더명을 정확히 식별하여 각각 Top 10 추출:
-  "Human Anatomy"        → sub_categories.human_anatomy
+- 아래 8개 헤더명 식별하여 각각 Top 10 추출:
+  "Human Anatomy"         → sub_categories.human_anatomy
   "Motion Smoothness" 또는 "Motion Rationality" → sub_categories.motion_rationality
   "Instance Preservation" → sub_categories.instance_preservation
-  "Human Identity"       → sub_categories.human_identity
-  "Dynamic Attribute"    → sub_categories.dynamic_attribute
-  "Complex Plot"         → sub_categories.complex_plot
-  "Camera Motion"        → sub_categories.camera_motion
-  "Complex Landscape"    → sub_categories.complex_landscape
+  "Human Identity"        → sub_categories.human_identity
+  "Dynamic Attribute"     → sub_categories.dynamic_attribute
+  "Complex Plot"          → sub_categories.complex_plot
+  "Camera Motion"         → sub_categories.camera_motion
+  "Complex Landscape"     → sub_categories.complex_landscape
+- Complex Landscape 검증: 추출값이 70 이상이면 잘못된 컬럼 → 재추출 또는 null 처리.
+- 점수 포맷: "85.20%" → 85.2 (% 기호 제거)
+- Source 1이 "(없음)"이면 total_ranking = []
 
-[규칙 1-보조: Complex Landscape 반드시 검증]
-- Complex Landscape 점수는 원래 5~30 사이가 정상이다.
-- 추출한 값이 70 이상이면 → 잘못된 컬럼을 읽은 것이다.
-- 이 경우 헤더를 다시 확인하고, "Complex Landscape" 텍스트가 있는 컬럼을 정확히 찾아 재추출하라.
-- 재추출 후에도 값이 70 이상이면 null로 처리하라.
+[규칙 2: VBench 2.0 (Source 2, 선택)]
+- "Total Score" 컬럼 기준 내림차순 Top 10 → vbench2_ranking
+- 수치형 컬럼 중 중요한 순 최대 8개를 snake_case 키로 변환 → vbench2_sub_categories
+  예: "Subject Consistency" → subject_consistency
+- Source 2가 "(없음)"이면 vbench2_ranking = [], vbench2_sub_categories = {}
 
-점수 포맷: "85.20%" → 85.2 (숫자로 변환), % 기호 제거.
+[규칙 3: LMArena (Source 3~5)]
+- 각 표에서 Model명, Elo(900~1500), Organization 추출. Top 10.
+- 없으면 빈 배열 []
 
-[규칙 2: org 필드 — 반드시 아래 목록에서 정확히 선택]
-허용 값: "Google" | "OpenAI" | "Alibaba" | "Kuaishou" | "Tencent" | "Zhipu AI" | "ShengShu" | "Runway" | "Luma" | "Hailuo AI" | "StepFun" | "Wondershare" | "Others"
-매핑 힌트:
-- Veo, Imagen (video) → "Google"
-- Sora → "OpenAI"
-- Wan, Qwen (video) → "Alibaba"
-- Kling → "Kuaishou"
-- Hunyuan → "Tencent"
-- CogVideo, CogVideoX → "Zhipu AI"
-- Vidu → "ShengShu"
-- Gen-3, Gen-4 → "Runway"
-- Hailuo → "Hailuo AI"
-- StepVideo → "StepFun"
-- ToMoviee → "Wondershare"
+[규칙 4: Artificial Analysis (Source 6, 선택)]
+- Generation Time (초/영상): 오름차순 Top 10 → aa_speed.items (score 필드)
+- Price: 오름차순 Top 10 → aa_price.items (score 필드)
+- 각 comment: 해당 지표 1위 모델과 수치 언급한 한글 1문장.
+- Source 6이 없으면 aa_speed = {items:[], comment:""}, aa_price = {items:[], comment:""}
 
-[규칙 3: LMSYS (Source 2, 3)]
-- 각 표에서 Model명, Elo(보통 900~1500 사이), Organization 추출.
-- Top 10씩 추출.
+[규칙 5: org 필드]
+허용값: "Google"|"OpenAI"|"Alibaba"|"Kuaishou"|"Tencent"|"Zhipu AI"|"ShengShu"|"Runway"|"Luma"|"Hailuo AI"|"StepFun"|"ByteDance"|"Others"
+매핑: Veo/Imagen→Google, Sora→OpenAI, Wan/Qwen→Alibaba, Kling→Kuaishou, Hunyuan→Tencent, CogVideo→Zhipu AI, Vidu→ShengShu, Gen-3/Gen-4→Runway, Hailuo→Hailuo AI, StepVideo→StepFun, Seedream/Seaweed→ByteDance
 
-[규칙 4: vote_rankings.overall]
-- 빈 배열 [] 로 두어라. (서버에서 자동으로 계산하여 채운다.)
+[규칙 6: vote_rankings.overall]
+빈 배열 [] (서버에서 자동 계산)
 
-[규칙 5: comment 및 summary_insights]
-- comment: 각 카테고리 한글 1문장 분석.
-- summary_insights: 정확히 5문장, 구체적 모델명과 수치 포함.
+[규칙 7: comment 및 summary_insights]
+- comment: 각 카테고리 한글 1문장.
+- summary_insights: 정확히 5문장, 모델명·수치 포함.
 
 [출력 JSON]
 {
   "report_type": "VIDEO",
   "raw_data": {
     "test_benchmarks": {
-      "total_ranking": [ {"rank":1, "model":"Veo 3", "score":85.2, "org":"Google"}, ... ],
+      "total_ranking": [ {"rank":1, "model":"Veo 3", "score":85.2, "org":"Google"} ],
       "sub_categories": {
-        "human_anatomy":         { "items": [ {"rank":1, "model":"...", "score":90.1, "org":"Google"} ], "comment": "" },
-        "motion_rationality":    { "items": [], "comment": "" },
-        "instance_preservation": { "items": [], "comment": "" },
-        "human_identity":        { "items": [], "comment": "" },
-        "dynamic_attribute":     { "items": [], "comment": "" },
-        "complex_plot":          { "items": [], "comment": "" },
-        "camera_motion":         { "items": [], "comment": "" },
-        "complex_landscape":     { "items": [], "comment": "" }
-      }
+        "human_anatomy":         {"items": [], "comment": ""},
+        "motion_rationality":    {"items": [], "comment": ""},
+        "instance_preservation": {"items": [], "comment": ""},
+        "human_identity":        {"items": [], "comment": ""},
+        "dynamic_attribute":     {"items": [], "comment": ""},
+        "complex_plot":          {"items": [], "comment": ""},
+        "camera_motion":         {"items": [], "comment": ""},
+        "complex_landscape":     {"items": [], "comment": ""}
+      },
+      "vbench2_ranking": [],
+      "vbench2_sub_categories": {},
+      "aa_speed": {"items": [], "comment": ""},
+      "aa_price": {"items": [], "comment": ""}
     },
     "vote_rankings": {
       "overall": [],
       "sub_categories": {
-        "text_to_video":  { "items": [ {"rank":1, "model":"...", "elo":1200, "org":"Google"} ], "comment": "" },
-        "image_to_video": { "items": [], "comment": "" }
+        "text_to_video":  {"items": [], "comment": ""},
+        "image_to_video": {"items": [], "comment": ""},
+        "video_edit":     {"items": [], "comment": ""}
       }
     }
   },
@@ -493,6 +527,148 @@ ${combinedText}
     "vote_rankings": { "overall": [], "sub_categories": {} }
   },
   "summary_insights": ["WER이 낮을수록 정확한 인식이며...", "...", "...", "...", "..."]
+}
+
+[입력 데이터]
+${combinedText}
+    `;
+
+  // ══════════════════════════════════════════
+  //  CODE 프롬프트 — SWE-bench + Aider + LMArena Code Arena
+  // ══════════════════════════════════════════
+  } else if (type === 'CODE') {
+    prompt = `
+너는 '코딩 AI 벤치마크 파서'이다.
+입력 데이터는 최대 6개의 Source로 구분되어 있다.
+
+[소스 매핑 — 절대 규칙]
+- Source 1 (SWE-bench Verified, 정량) → test_benchmarks.sub_categories.swe_bench
+- Source 2 (Aider 리더보드, 정량, 선택) → test_benchmarks.sub_categories.aider
+- Source 3 (LMArena Code – WebDev Overall, 정성) → vote_rankings.sub_categories.webdev_overall
+- Source 4 (LMArena Code – WebDev HTML, 정성, 선택) → vote_rankings.sub_categories.webdev_html
+- Source 5 (LMArena Code – WebDev React, 정성, 선택) → vote_rankings.sub_categories.webdev_react
+- Source 6 (LMArena Code – Image to WebDev, 정성, 선택) → vote_rankings.sub_categories.image_to_webdev
+
+[규칙 1: test_benchmarks.sub_categories.swe_bench]
+- Source 1에서 % Resolved 내림차순 Top 10 → items + comment(한글 1문장).
+- 각 항목: rank, model, score(% Resolved 숫자, 예: 72.5), org
+
+[규칙 2: test_benchmarks.sub_categories.aider (Source 2가 있을 때만)]
+- Aider % correct 내림차순 Top 10 → items + comment(한글 1문장).
+- 없으면 items: [], comment: "".
+
+[규칙 3: test_benchmarks.total_ranking — 정량 종합 순위]
+- Source 1(SWE-bench) + Source 2(Aider) 모두 있는 경우:
+  a) 두 소스에 공통 등장하는 모델은 두 점수의 단순 평균을 score로 사용.
+  b) 한 소스에만 있는 모델은 있는 점수만으로 score 계산(단독 점수 그대로).
+  c) score 내림차순 Top 10 생성.
+  d) comment: "SWE-bench + Aider 종합 점수 기준"을 명시한 한글 1문장.
+- Source 1만 있는 경우: swe_bench의 items를 그대로 복사.
+  d) comment: "SWE-bench 단독 기준"을 명시한 한글 1문장.
+
+
+[규칙 4: vote_rankings.sub_categories — LMArena Code Arena]
+- Score(Elo) 내림차순 Top 10.
+- 각 항목: rank, model, score(Elo), org
+- Source 없으면 해당 카테고리 items: [], comment: "".
+
+[규칙 5: org 필드]
+허용값: "OpenAI"|"Anthropic"|"Google"|"xAI"|"Meta"|"Mistral"|"DeepSeek"|"Qwen"|"Microsoft"|"Amazon"|"Nvidia"|"Others"
+매핑: GPT-4o, o3→OpenAI, Claude→Anthropic, Gemini→Google, Grok→xAI, Llama→Meta
+
+[규칙 6: vote_rankings.overall]
+- webdev_overall의 items를 그대로 복사.
+
+[규칙 7: summary_insights — 정확히 5문장]
+- 1문장: SWE-bench 1위 모델과 해결률(%) 언급.
+- 2문장: LMArena WebDev 1위 모델과 Elo 점수 언급.
+- 3문장: 오픈소스 vs 클로즈드 소스 비교 인사이트.
+- 4문장: Aider 데이터가 있으면 Aider 1위 언급, 없으면 주목할 모델 언급.
+- 5문장: 전체 코딩 AI 트렌드 총평.
+
+[출력 JSON]
+{
+  "report_type": "CODE",
+  "raw_data": {
+    "test_benchmarks": {
+      "total_ranking": [{"rank":1,"model":"...","score":0,"org":"...","comment":""}],
+      "sub_categories": {
+        "swe_bench": {"items":[{"rank":1,"model":"...","score":0,"org":"..."}],"comment":""},
+        "aider":     {"items":[],"comment":""}
+      }
+    },
+    "vote_rankings": {
+      "overall": [{"rank":1,"model":"...","score":0,"org":"..."}],
+      "sub_categories": {
+        "webdev_overall":  {"items":[],"comment":""},
+        "webdev_html":     {"items":[],"comment":""},
+        "webdev_react":    {"items":[],"comment":""},
+        "image_to_webdev": {"items":[],"comment":""}
+      }
+    }
+  },
+  "summary_insights": ["...","...","...","...","..."]
+}
+
+[입력 데이터]
+${combinedText}
+    `;
+
+  // ══════════════════════════════════════════
+  //  SERVICE 프롬프트 — AI 서비스 트래픽 랭킹
+  // ══════════════════════════════════════════
+  } else if (type === 'SERVICE') {
+    prompt = `
+너는 'AI 서비스 트래픽 랭킹 파서'이다.
+입력 데이터는 최대 2개의 Source로 구분되어 있다.
+
+[소스 매핑]
+- Source 1 (SimilarWeb 종합) → overall + categories.chatbot / image / video 자동 분류
+- Source 2 (코딩 도구, 선택)  → categories.coding
+
+[규칙 1: overall — 전체 종합 순위]
+- 방문자 수 내림차순 Top 15 → overall
+- 각 항목: rank, service(서비스명), org(제조사), monthly_visits(정수), growth(예:"＋12%" 또는 "−5%"), category(아래 분류)
+- category 분류 기준:
+  "chatbot"  : 일반 AI 챗봇·어시스턴트 (ChatGPT, Claude, Gemini, Perplexity, Grok, Le Chat 등)
+  "coding"   : 코딩 특화 도구 (Cursor, GitHub Copilot, Windsurf, Bolt, v0 등)
+  "image"    : 이미지 생성 서비스 (Midjourney, Adobe Firefly, Ideogram, Canva AI 등)
+  "video"    : 영상 생성 서비스 (Runway, Pika, Sora, Kling, Veo 등)
+  "other"    : 그 외
+
+[규칙 2: categories — 카테고리별 상위 목록]
+- 위 overall 데이터를 category 기준으로 분리하여 각 카테고리에 넣어라.
+- 각 카테고리: items(Top 10) + comment(한글 1문장)
+- Source 2가 있으면 coding 카테고리에 추가 반영.
+
+[규칙 3: org 필드]
+허용값: "OpenAI"|"Google"|"Anthropic"|"Perplexity AI"|"xAI"|"Meta"|"Microsoft"|"Anysphere"|"Midjourney"|"Adobe"|"Runway"|"Stability AI"|"ByteDance"|"Mistral"|"Others"
+매핑: ChatGPT/Sora→OpenAI, Gemini→Google, Claude→Anthropic, Grok→xAI, Cursor/Windsurf→Anysphere, Copilot→Microsoft, Llama→Meta, Seaweed/Seedance→ByteDance
+
+[규칙 4: monthly_visits]
+- 반드시 정수(Integer)로 변환. "3B" → 3000000000, "500M" → 500000000
+- 데이터가 없으면 null
+
+[규칙 5: summary_insights]
+- 정확히 5문장, 한글, 구체적 서비스명과 방문자 수 포함.
+
+[출력 JSON]
+{
+  "report_type": "SERVICE",
+  "raw_data": {
+    "overall": [
+      {"rank":1, "service":"ChatGPT", "org":"OpenAI", "monthly_visits":3000000000, "growth":"+5%", "category":"chatbot"},
+      {"rank":2, "service":"Gemini", "org":"Google", "monthly_visits":500000000, "growth":"+12%", "category":"chatbot"}
+    ],
+    "categories": {
+      "chatbot": {"items": [], "comment": ""},
+      "coding":  {"items": [], "comment": ""},
+      "image":   {"items": [], "comment": ""},
+      "video":   {"items": [], "comment": ""},
+      "other":   {"items": [], "comment": ""}
+    }
+  },
+  "summary_insights": ["...", "...", "...", "...", "..."]
 }
 
 [입력 데이터]

@@ -8,13 +8,14 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 const REPORT_CATEGORIES = [
-  { id: "llm", label: "LLM 순위", icon: "🤖", searchKey: "LLM", keywords: ["LLM", "종합"] },
-  { id: "image", label: "이미지 AI", icon: "🎨", searchKey: "Image", keywords: ["Image", "이미지"] },
-  { id: "video", label: "영상 AI", icon: "🎬", searchKey: "Video", keywords: ["Video", "영상"] },
-  { id: "tts", label: "TTS (음성 합성)", icon: "🎶", searchKey: "TTS", keywords: ["TTS", "음성합성", "Voice"] },
-  { id: "stt", label: "STT (음성 인식)", icon: "🎙️", searchKey: "STT", keywords: ["STT", "음성인식", "Speech"] },
-  { id: "service", label: "서비스 랭킹", icon: "🏆", searchKey: "Service", keywords: ["Service", "서비스"] },
+  { id: "llm",  label: "LLM 순위",       icon: "🤖",  searchKey: "LLM",   keywords: ["LLM", "종합"] },
+  { id: "image", label: "이미지 AI",      icon: "🎨",  searchKey: "Image", keywords: ["Image", "이미지"] },
+  { id: "video", label: "영상 AI",        icon: "🎬",  searchKey: "Video", keywords: ["Video", "영상"] },
+  { id: "code",  label: "코딩 AI",        icon: "💻",  searchKey: "CODE",  keywords: ["CODE", "코딩", "Code"] },
+  { id: "tts",   label: "TTS (음성 합성)", icon: "🎶",  searchKey: "TTS",   keywords: ["TTS", "음성합성", "Voice"] },
+  { id: "stt",   label: "STT (음성 인식)", icon: "🎙️", searchKey: "STT",   keywords: ["STT", "음성인식", "Speech"] },
 ];
+
 
 const SUMMARY_ICONS = ["🎯", "📈", "💡", "⚡", "🔮"];
 
@@ -56,8 +57,12 @@ export default function ReportTab() {
     if (!currentCat) return;
 
     const filtered = allReports.filter(report => {
-      const title = report.analysis_result?.report_title || "";
-      return currentCat.keywords.some(keyword => title.includes(keyword));
+      // 1차: report_type으로 정확 매칭 (가장 신뢰할 수 있는 방법)
+      const reportType = (report.analysis_result?.report_type || "").toUpperCase();
+      if (reportType === currentCat.searchKey.toUpperCase()) return true;
+      // 2차: report_title 키워드 매칭 (대소문자 무시)
+      const title = (report.analysis_result?.report_title || "").toLowerCase();
+      return currentCat.keywords.some(keyword => title.includes(keyword.toLowerCase()));
     });
 
     setFilteredReports(filtered);

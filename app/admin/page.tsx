@@ -37,19 +37,50 @@ const REPORT_CONFIG: Record<string, ReportConfigEntry> = {
   },
   Image: {
     label: "이미지 AI", icon: "🎨", color: "pink",
-    desc: "LMSYS Text-to-Image & Image Edit",
+    desc: "LMArena 10개 카테고리 Elo (정성) + Artificial Analysis 속도·가격 (정량, 선택)",
     sources: [
-      { id: "img_t2i",  name: "LMSYS – Text-to-Image", url: "https://lmarena.ai/?leaderboard", desc: "'Text-to-Image' 탭 랭킹 표 복사" },
-      { id: "img_edit", name: "LMSYS – Image Edit",    url: "https://lmarena.ai/?leaderboard", desc: "'Image Edit' 탭 랭킹 표 복사" },
+      // ── Text-to-Image (8개) ──
+      { id: "t2i_overall",  name: "LMArena – T2I Overall",          url: "https://lmarena.ai/?leaderboard", desc: "Image 탭 → Text-to-Image Arena → Overall → 표 전체 복사" },
+      { id: "t2i_product",  name: "LMArena – T2I Product/Branding", url: "https://lmarena.ai/?leaderboard", desc: "Product, Branding & Commerce 탭 → 표 전체 복사" },
+      { id: "t2i_3d",       name: "LMArena – T2I 3D",               url: "https://lmarena.ai/?leaderboard", desc: "3D Imaging & Modeling 탭 → 표 전체 복사" },
+      { id: "t2i_cartoon",  name: "LMArena – T2I Cartoon/Anime",    url: "https://lmarena.ai/?leaderboard", desc: "Cartoon, Anime & Fantasy 탭 → 표 전체 복사" },
+      { id: "t2i_photo",    name: "LMArena – T2I Photorealistic",   url: "https://lmarena.ai/?leaderboard", desc: "Photorealistic & Cinematic 탭 → 표 전체 복사" },
+      { id: "t2i_art",      name: "LMArena – T2I Art",              url: "https://lmarena.ai/?leaderboard", desc: "Art 탭 → 표 전체 복사" },
+      { id: "t2i_portrait", name: "LMArena – T2I Portraits",        url: "https://lmarena.ai/?leaderboard", desc: "Portraits 탭 → 표 전체 복사" },
+      { id: "t2i_text",     name: "LMArena – T2I Text Rendering",   url: "https://lmarena.ai/?leaderboard", desc: "Text Rendering 탭 → 표 전체 복사" },
+      // ── Image Edit (2개) ──
+      { id: "ie_single",    name: "LMArena – Image Edit (Single)",  url: "https://lmarena.ai/?leaderboard", desc: "Image 탭 → Image Edit Arena → Single-Image Edit → 표 전체 복사" },
+      { id: "ie_multi",     name: "LMArena – Image Edit (Multi)",   url: "https://lmarena.ai/?leaderboard", desc: "Multi-Image Edit 탭 → 표 전체 복사" },
+      // ── Artificial Analysis (선택) ──
+      { id: "aa_image",     name: "Artificial Analysis – 속도·가격 (선택)", url: "https://artificialanalysis.ai/text-to-image", desc: "모델 비교표 복사 (Generation Time·Price 포함). 비워도 분석 진행." },
     ],
   },
   Video: {
     label: "영상 AI", icon: "🎬", color: "rose",
-    desc: "VBench(정량) + LMSYS T2V/I2V(정성)",
+    desc: "VBench 2.0 (정량) + LMArena T2V·I2V·Video Edit (정성) + AA 속도·가격 (선택)",
     sources: [
-      { id: "video_test",     name: "VBench (Test)",          url: "https://huggingface.co/spaces/Vchitect/VBench_Leaderboard", desc: "VBench Leaderboard 표 전체 복사" },
-      { id: "video_vote_t2v", name: "LMSYS – Text-to-Video",  url: "https://lmarena.ai/?leaderboard", desc: "'Text-to-Video' 탭" },
-      { id: "video_vote_i2v", name: "LMSYS – Image-to-Video", url: "https://lmarena.ai/?leaderboard", desc: "'Image-to-Video' 탭" },
+      // ── VBench 2.0 (정량) ──
+      { id: "video_test", name: "VBench 2.0 (정량)", url: "https://huggingface.co/spaces/Vchitect/VBench_Leaderboard", desc: "VBench 2.0 Leaderboard 표 전체 복사 (Total Score + 24개 세부 카테고리)" },
+      // ── LMArena (정성) ──
+      { id: "video_vote_t2v",  name: "LMArena – Text-to-Video",          url: "https://lmarena.ai/?leaderboard", desc: "Video 탭 → Text-to-Video → 표 전체 복사" },
+      { id: "video_vote_i2v",  name: "LMArena – Image-to-Video",         url: "https://lmarena.ai/?leaderboard", desc: "Image-to-Video 탭 → 표 전체 복사" },
+      { id: "video_vote_edit", name: "LMArena – Video Edit",              url: "https://lmarena.ai/?leaderboard", desc: "Video Edit 탭 → 표 전체 복사" },
+      // ── Artificial Analysis (선택) ──
+      { id: "aa_video",        name: "Artificial Analysis – 속도·가격 (선택)", url: "https://artificialanalysis.ai/video", desc: "모델 비교표 복사 (Generation Time·Price). 비워도 분석 진행." },
+    ],
+  },
+  Code: {
+    label: "코딩 AI", icon: "💻", color: "cyan",
+    desc: "SWE-bench (정량) + Aider (정량, 선택) + LMArena Code Arena 웹개발 4종 (정성)",
+    sources: [
+      // ── 정량 벤치마크 ──
+      { id: "code_swe",       name: "SWE-bench Verified (정량)",   url: "https://www.swebench.com/",                      desc: "Resolved 백분율 기준 표 전체 복사 (Model / % Resolved)" },
+      { id: "code_aider",    name: "Aider 리더보드 (정량, 선택)", url: "https://aider.chat/docs/leaderboards/",          desc: "Aider Coding Leaderboard 표 복사. 없으면 비워도 됨." },
+      // ── LMArena Code Arena (정성) ──
+      { id: "code_webdev",   name: "LMArena – WebDev Overall",          url: "https://lmarena.ai/?leaderboard",               desc: "Code 탭 → WebDev → Overall 표 복사" },
+      { id: "code_html",     name: "LMArena – WebDev HTML (선택)",    url: "https://lmarena.ai/?leaderboard",               desc: "WebDev → HTML 탭 표 복사. 없으면 비워도 됨." },
+      { id: "code_react",    name: "LMArena – WebDev React (선택)",   url: "https://lmarena.ai/?leaderboard",               desc: "WebDev → React 탭 표 복사. 없으면 비워도 됨." },
+      { id: "code_img2web",  name: "LMArena – Image to WebDev (선택)", url: "https://lmarena.ai/?leaderboard",               desc: "Image to WebDev 탭 표 복사. 없으면 비워도 됨." },
     ],
   },
   TTS: {
@@ -75,8 +106,10 @@ const colorMap: Record<string, { bg: string; ring: string; badge: string }> = {
   indigo:  { bg: "bg-indigo-600",  ring: "ring-indigo-500",  badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
   pink:    { bg: "bg-pink-600",    ring: "ring-pink-500",    badge: "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300"         },
   rose:    { bg: "bg-rose-600",    ring: "ring-rose-500",    badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"         },
+  cyan:    { bg: "bg-cyan-600",    ring: "ring-cyan-500",    badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"         },
   violet:  { bg: "bg-violet-600",  ring: "ring-violet-500",  badge: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
   emerald: { bg: "bg-emerald-600", ring: "ring-emerald-500", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  amber:   { bg: "bg-amber-500",   ring: "ring-amber-400",   badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
 };
 
 const ExternalIcon = () => (
@@ -107,6 +140,7 @@ export default function AdminPage() {
   const [adminTab, setAdminTab]         = useState<'report' | 'feedback' | 'tools' | 'reports' | 'inbox'>('report');
   const [selectedType, setSelectedType] = useState("LLM");
   const [inputs, setInputs]             = useState<Record<string, string>>({});
+  const [sourceUrls, setSourceUrls]     = useState<Record<string, string>>({});
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [loading, setLoading]           = useState(false);
   const [saving, setSaving]             = useState(false);
@@ -245,6 +279,12 @@ export default function AdminPage() {
   useEffect(() => {
     setInputs({}); setAnalysisResult(null); setTtsOk(false);
     setTtsPreview(null); setTtsError(null); setTtsCount(0);
+    // URL 초기화: 선택된 타입의 기본 URL로 재설정
+    const defaults: Record<string, string> = {};
+    REPORT_CONFIG[selectedType as keyof typeof REPORT_CONFIG]?.sources?.forEach((s: any) => {
+      defaults[s.id] = s.url;
+    });
+    setSourceUrls(defaults);
   }, [selectedType]);
 
   const cfg           = REPORT_CONFIG[selectedType];
@@ -1301,10 +1341,20 @@ export default function AdminPage() {
                             <p className="text-[11px] text-gray-400 dark:text-zinc-500 mt-0.5">{source.desc}</p>
                           </div>
                         </div>
-                        <a href={source.url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0">
-                          사이트 열기 <ExternalIcon />
-                        </a>
+                        {/* 사이트 열기 + URL 수정 */}
+                        <div className="flex flex-col gap-1.5 items-end flex-shrink-0">
+                          <a href={sourceUrls[source.id] || source.url} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">
+                            사이트 열기 <ExternalIcon />
+                          </a>
+                          <input
+                            type="text"
+                            value={sourceUrls[source.id] ?? source.url}
+                            onChange={e => setSourceUrls(p => ({ ...p, [source.id]: e.target.value }))}
+                            className="w-64 text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 focus:outline-none focus:border-indigo-400 font-mono"
+                            placeholder="URL 수정..."
+                          />
+                        </div>
                       </div>
                       <div className="relative">
                         <textarea rows={isSTT ? 10 : 7}
