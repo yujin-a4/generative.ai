@@ -16,6 +16,7 @@ import { generateMonthlySummary } from "@/app/actions/generateMonthlySummary";
 import SummaryModal from "@/app/components/NewsTab/SummaryModal";
 import ReportView from "./ReportView";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import { showToast } from "@/app/lib/toast";
 
 type Source = { id: string; name: string; url: string; desc: string };
 type ReportConfigEntry = { label: string; icon: string; color: string; desc: string; sources: Source[] };
@@ -328,8 +329,8 @@ export default function AdminPage() {
     setSaving(true);
     try {
       const result = await saveReportToDB(target.report_title || `${selectedType} 분석 리포트`, target);
-      if (result.success) { alert("✅ 발행 완료!"); setAnalysisResult(null); setInputs({}); setTtsOk(false); setTtsPreview(null); }
-      else { alert(`저장 실패: ${result.error}`); }
+      if (result.success) { showToast("✅ 발행 완료!", "success"); setAnalysisResult(null); setInputs({}); setTtsOk(false); setTtsPreview(null); }
+      else { showToast(`저장 실패: ${result.error}`, "error"); }
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
   };
@@ -548,7 +549,8 @@ export default function AdminPage() {
                       });
                       setDraftNews(prev => prev.filter(n => n.id !== article.id));
                       setPreviewArticle(null);
-                    } catch { alert('게시 실패'); }
+                      showToast("✅ 뉴스가 게시되었습니다!", "success");
+                    } catch { showToast('게시 실패', 'error'); }
                   }}
                   className="flex-1 py-2.5 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
                 >

@@ -5,6 +5,7 @@ import { analyzeNewsArticle } from "@/app/actions/analyzeNews";
 import { NEWS_CATEGORIES } from "@/app/lib/newsCategories";
 import { addNews, updateNews, NewsArticle } from "@/app/lib/newsService";
 import { auth } from "@/lib/firebase";
+import { showToast } from "@/app/lib/toast";
 
 // 🌟 TypeScript 오류 방지를 위한 타입 정의
 interface Site {
@@ -173,15 +174,15 @@ export default function NewsSubmitModal({ isOpen, onClose, initialData }: NewsSu
     try {
       if (initialData && initialData.id) {
         await updateNews(initialData.id, { ...analysisData, url: url });
-        alert("뉴스가 수정되었습니다! ✨");
+        showToast("뉴스가 수정되었습니다! ✨", "success");
       } else {
         await addNews({ ...analysisData, url: url });
-        alert("뉴스가 게시되었습니다! 🎉");
+        showToast("뉴스가 게시되었습니다! 🎉", "success");
       }
       onClose(); 
     } catch (error) {
       console.error(error);
-      alert("처리 중 오류가 발생했습니다.");
+      showToast("처리 중 오류가 발생했습니다.", "error");
     } finally {
       setIsSubmitting(false);
     }
