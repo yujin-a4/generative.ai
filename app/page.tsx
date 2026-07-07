@@ -103,7 +103,7 @@ function MainContent() {
         />
 
         {/* 메인 컨텐츠 영역 */}
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <div className={`flex-1 min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
           {/* 우측 상단 — 테마 토글 + 로그인 */}
           <div className="fixed top-4 right-6 z-50 flex items-center gap-2">
             <ThemeToggle />
